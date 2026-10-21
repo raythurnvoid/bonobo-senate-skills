@@ -16,8 +16,9 @@ Run `status` first. It prints where the key came from, the API origin, and the r
 - Exit 4: no key is set up. Go to step 2.
 - Exit 1 with `HTTP 401`: the key does not work, for example because it was revoked. Go to step 2 for a new key. Any other exit 1 (a 429 or a server error) passes with time.
 - Exit 3: the API cannot be reached. The key may be fine, so do not ask for a new one. Check the network and the sandbox note in step 3.
+- No exit code: the script did not start. For example `node` is not found, the run says "Access is denied", or the key file cannot be read. The agent's sandbox blocks the script, so this says nothing about the key. Tell the user to give the session full access, or to allow Node, the network, and the `~/.config/bonobo-senate` folder. Do not work around it.
 
-The script reads `T3_API_KEY` and `T3_API_ORIGIN` when `T3_API_KEY` is set. The origin must use `https`, except for a local server. Otherwise it reads `~/.config/bonobo-senate/credentials.json` (or `$XDG_CONFIG_HOME/bonobo-senate/credentials.json`). The key lives there, outside this skill folder, so a skill update cannot delete it and a copy of the skill cannot carry it. Do not print, copy, or move that file. You may read the key into a variable inside the command that uses it, as [upload](references/upload.md) shows. Never put the key in chat, in a command line, or in a file you write.
+The script reads `T3_API_KEY` and `T3_API_ORIGIN` when `T3_API_KEY` is set. The origin must use `https`, except for a local server. Otherwise it reads `~/.config/bonobo-senate/credentials.json` (or `$XDG_CONFIG_HOME/bonobo-senate/credentials.json`). The key lives there, outside this skill folder, so a skill update cannot delete it and a copy of the skill cannot carry it. Do not print, copy, or move that file. You may read the key into a variable inside the command that uses it, as [upload](references/upload.md) shows, but only to send a request. Do not open the file to check whether a key exists: `status` is the only check. Never put the key in chat, in a command line, or in a file you write.
 
 ## 2. Create a key (the user does this)
 
