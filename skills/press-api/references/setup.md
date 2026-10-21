@@ -14,11 +14,11 @@ Run `status` first. It prints where the key came from, the API origin, and the r
 - Exit 4: no key is set up. Go to step 2.
 - Exit 1: the key does not work, for example because it was revoked. Go to step 2 for a new key.
 
-The script reads `T3_API_KEY` and `T3_API_ORIGIN` when `T3_API_KEY` is set. Otherwise it reads `~/.config/bonobo-senate/credentials.json` (or `$XDG_CONFIG_HOME/bonobo-senate/credentials.json`). The key lives there, outside this skill folder, so a skill update cannot delete it and a copy of the skill cannot carry it. Do not read, print, copy, or move that file. Never put the key in chat, in a command line, or in a file you write.
+The script reads `T3_API_KEY` and `T3_API_ORIGIN` when `T3_API_KEY` is set. Otherwise it reads `~/.config/bonobo-senate/credentials.json` (or `$XDG_CONFIG_HOME/bonobo-senate/credentials.json`). The key lives there, outside this skill folder, so a skill update cannot delete it and a copy of the skill cannot carry it. Do not print, copy, or move that file. You may read the key into a variable inside the command that uses it, as [upload](references/upload.md) shows. Never put the key in chat, in a command line, or in a file you write.
 
 ## 2. Create a key (the user does this)
 
-Do this only when the user asks for setup. An agent cannot create a key: only a signed-in user can, on the app's API keys page. Tell the user:
+Do this only when the user asks for setup. No API route creates a key: only a signed-in user can, on the app's API keys page. Tell the user:
 
 1. Open the workspace in the app, then open **API keys** (`/w/<organization>/<workspace>/api-keys`).
 2. Create a key with only the scopes the task needs: `files:list` and `files:read` to read; add `files:write` to upload or write; add `files:download` for download URLs and byte reads.
@@ -26,6 +26,8 @@ Do this only when the user asks for setup. An agent cannot create a key: only a 
 4. Copy the API origin from the "Use an API key" section of the same page (the `T3_API_ORIGIN` value). It is not the app website address.
 
 A key works in one workspace only. Another workspace needs its own key.
+
+If the user asks you to create the key for them, and you can control their signed-in browser, you may do these steps there. Never print the key or write it to a file: copy it with the page's copy button, pipe the clipboard into `login` (step 3), then clear the clipboard.
 
 ## 3. Save the key (the user does this)
 
@@ -63,7 +65,7 @@ node <skill folder>/scripts/api.mjs upload ./photos ./notes.md --to /Inbox
 
 In Git Bash on Windows, set `MSYS_NO_PATHCONV=1` first. Otherwise Git Bash turns `--to /Inbox` into a Windows path such as `C:/Program Files/Git/Inbox`, and the script refuses it. Then write local paths as `C:/...`, not `/c/...`.
 
-A local folder keeps its own name under `--to`, like `cp -R`: `./photos/a.png` becomes `/Inbox/photos/a.png`. Missing folders are created. Run `--dry-run` first: it prints every target path, type, and size, and sends nothing.
+The script does not rename files. The server refuses a name that is not clean, for example one that starts with `_` or has a capital letter. Clean the names first, as [upload](references/upload.md) step 2 shows. A local folder keeps its own name under `--to`, like `cp -R`: `./photos/a.png` becomes `/Inbox/photos/a.png`. Missing folders are created. Run `--dry-run` first: it prints every target path, type, and size, and sends nothing.
 
 The script follows the upload steps in [Files](references/files.md): `upload-urls` in batches of 20, then one PUT per file. It waits and retries when rate limited. When the server refuses one file by path (a name clash with `--overwrite fail`, a locked folder), it reports that file and goes on with the rest. A refusal that hits every file (a bad key, a plan without uploads, full storage) stops the run, and every file left is reported with that reason.
 
