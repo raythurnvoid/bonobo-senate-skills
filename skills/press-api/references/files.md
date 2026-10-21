@@ -18,6 +18,18 @@ Keep all list fields unchanged while following a cursor. A short page is not the
 
 `extension: "md"` selects one extension. For type families use `recursive: true` and 1–8 `contentTypePrefixes`, with no extension. Values are whole families such as `image/` or exact types such as `image/png`; `image/p` is an exact type, not a prefix search. Filters use indexes. Narrowing the output does not open locked folders.
 
+## Check paths, make folders, delete
+
+`stat` takes `{ paths }`, 1 to 100 absolute paths, not `/`. Success is `{ items: [{ path, status, item? }] }`, in the order sent. `found` comes with `item`, the same shape as a `list` item. A locked item in a readable folder is `found` with `locked: true`. `denied` is a path inside a locked folder; it answers the same whether the name exists or not. `missing` means nothing is there.
+
+`mkdir` takes `{ paths }`, 1 to 20 canonical folder paths with no repeats. It works like `mkdir -p`: it makes the missing folders above too, and an existing folder answers `created: false`, also a locked one you can see in its folder. Success is `{ items: [{ path, nodeId, created }] }`. It is all or nothing: one refusal makes no folder and answers `{ message, path }` with 403 `Permission denied`, 409 when a file is at the path or in the way, or 400 for a bad path or a name, path, or folder limit. Making folders needs no credits.
+
+`delete` takes `{ paths }`, 1 to 200 absolute paths with no repeats, not `/`. Split a longer list into several calls. It needs a personal key; a key bound to a service account gets 403. It works like `rm -r` with several paths: it archives what it can and refuses each bad path alone. The app Trash can restore archived items. Success is `{ jobId, isDone, refused: [{ path, message }] }`. `refused` names missing paths (`Not found`), locked paths and paths inside a locked folder (`Permission denied`), and items the job refused, such as a read-only file inside a folder. A big folder goes on in the background: `isDone: false` with a `jobId`. `jobId` is `null` when nothing is left to follow. An item that is already archived is skipped, like `rm -f`, so a retry is safe. 429 means too many changes in a row; wait `retryAfterMs`.
+
+`jobs/get` takes `{ jobId }` and answers `{ jobId, kind: "delete", status, progress, errorMessage, refused: [{ path, message }] }`. `status` is `queued`, `running`, `succeeded`, `partial` (some items were refused), `failed`, `timed_out`, or `canceled`. A refused `path` is `null` when the key can no longer read that item. Only the key that started the job can read it; another key gets 404 `Job not found`. A finished job is deleted after 7 days, and then it is 404 too. If the key is revoked or loses `files:write` while the job still checks items, the job stops with `failed` and `errorMessage` says so; a delete that already passed its check finishes.
+
+No route moves, renames, or copies yet.
+
 ## Text and byte reads
 
 | Route suffix under `/api/v1/files/` | Body | Success |
@@ -38,7 +50,7 @@ Short grants share an 8 MiB byte budget in one `execute_code` run, across curren
 
 POST `/api/v1/files/write` with `{ path, content, overwrite?: "replace" | "fail", skipIfUnchanged?, nonCollaborative?, contentType? }`. Success includes `path`, `nodeId`, `contentType`, and optionally `unchanged`. Empty text is refused; use `touch` with `{ paths: [...] }` for up to eight empty editable files.
 
-`write-many` takes `{ files: [{ path, content, overwrite?, nonCollaborative?, contentType? }], skipIfUnchanged? }`: at most 20 files and 8,000,000 request bytes. Success is `{ written: [...], errors: [{ path, message, errorCode }] }`. Body validation is for the whole request. Runtime writes have per-item results; do not assume the whole batch rolled back. A mid-batch lost credential can return 401 after earlier writes finished. Reconcile saved results before retrying.
+`write-many` takes `{ files: [{ path, content, overwrite?, nonCollaborative?, contentType? }], skipIfUnchanged? }`: at most 20 files and 8,000,000 request bytes. Success is `{ written: [...], errors: [{ path, message, errorCode }] }`. Body validation is for the whole request. Runtime writes have per-item results; do not assume the whole batch rolled back. A mid-batch lost credential (401) or a bad item (400) can stop the batch after earlier writes finished. Reconcile saved results before retrying.
 
 Writes save directly. Filling an editable file keeps its node ID. Replacing a stored binary file archives the old node and creates a new one. `overwrite: "fail"` returns 409 `A file already exists at this path`, also for a visible locked name. Overwriting a locked file, or writing any name below a locked folder, returns 403. A write policy can still refuse an otherwise allowed write.
 
@@ -58,10 +70,10 @@ Names have at most 255 characters; new paths have at most 1,024. One action can 
 
 ## Anyone on the web
 
-`public/set` takes `{ nodeId, public }`, where `public` is a boolean. Success is `{ nodeId, public: "on" | "inherited" | "off" }`. It needs `files:publish` and a personal key. A public file, or a file inside a public folder, can show as an image or video on public link pages. It never opens the file by ID. Turning it on needs management and read permission on the target; turning it off needs management. A scope alone is insufficient.
+`public/set` takes `{ nodeId, public }`, where `public` is a boolean. Success is `{ nodeId, public: "on" | "inherited" | "off" }`. It needs `files:publish` and a personal key. A public file, or a file inside a public folder down to the nearest restricted folder, can show as an image or video on public link pages. A restricted folder inside stays off. It never opens the file by ID. Turning it on needs management and read permission on the target; turning it off needs management. A scope alone is insufficient.
 
 - `inherited` means a public folder above makes the item public. Turning such an item off returns 403; turn it off on that folder.
 - Repeating the current value changes nothing.
-- 400: bad body. 401: the key or its membership is unavailable. 404: missing, archived, or not managed by the key's user, or not readable for On. 409: the item is being moved, or an access change of the item or a folder above is still running; retry later. 429: too many Sharing changes; wait `retryAfterMs`. 403: other refusals, such as a plugin-bound folder.
+- 400: bad body. 401: the key or its membership is unavailable. 404: missing, archived, or not managed by the key's user, or not readable for On. 409 (turning on only): the item is being moved, or an access change of the item or a folder above is still running; retry later. 429: too many Sharing changes; wait `retryAfterMs`. 403: other refusals, such as a plugin-bound folder.
 
-Plugin conditional writes, folder access, and sealed uploads have extra fields and retry rules. Read [plugin runtime](references/plugin-runtime.md) before using them. There is no public API to turn public file links on or off or retrieve their link tokens.
+Plugin conditional writes, folder access, and sealed uploads have extra fields and retry rules. Read [plugin runtime](references/plugin-runtime.md) before using them. There is no public API to turn "Anyone with the link" share links on or off or retrieve their link tokens. That is separate from `public/set`.
