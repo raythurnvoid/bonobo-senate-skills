@@ -316,15 +316,17 @@ async function wait_for_job(credentials, jobId) {
 	}
 }
 
-// A move or copy job returns its refused items a page at a time. Read the other pages too.
+// A job returns its refused and renamed items a page at a time. Read the other pages too.
 async function read_all_refused(credentials, job) {
 	const refused = [...job.refused];
+	const renamed = [...job.renamed];
 	for (let cursor = job.refusedCursor; cursor; ) {
 		const page = await post_json(credentials, "files/jobs/get", { jobId: job.jobId, cursor });
 		refused.push(...page.refused);
+		renamed.push(...page.renamed);
 		cursor = page.refusedCursor;
 	}
-	return { ...job, refused, refusedCursor: null };
+	return { ...job, refused, renamed, refusedCursor: null };
 }
 // #endregion requests
 
@@ -513,10 +515,12 @@ async function command_restore(args) {
 		...(onConflict ? { onConflict } : {}),
 		requestId,
 	});
-	// One job for each delete the paths came from. The jobs run one after another.
+	// One job for each delete the paths came from. The jobs run one after another. Read them when they
+	// ended too: only the jobs name the items that came back with a new name or stayed in the Trash.
 	const jobs = [];
-	if (values.wait) for (const jobId of restored.jobIds) jobs.push(await wait_for_job(credentials, jobId));
-	print_json({ requestId, ...restored, ...(values.wait ? { jobs } : {}) });
+	const readJobs = values.wait || restored.isDone;
+	if (readJobs) for (const jobId of restored.jobIds) jobs.push(await wait_for_job(credentials, jobId));
+	print_json({ requestId, ...restored, ...(readJobs ? { jobs } : {}) });
 	return restored.refused.length > 0 || jobs.some((job) => job.status !== "succeeded") ? 1 : 0;
 }
 
