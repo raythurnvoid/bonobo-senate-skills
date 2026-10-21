@@ -1,0 +1,16 @@
+{
+	"name": "bonobo-senate-skills",
+	"owner": {
+		"name": "raythurnvoid"
+	},
+	"metadata": {
+		"description": "Agent skills for Bonobo Senate."
+	},
+	"plugins": [
+		{
+			"name": "bonobo-senate",
+			"source": "./",
+			"description": "Use the Bonobo Senate public API from an agent: set up an API key, list, read, write, and upload files."
+		}
+	]
+}

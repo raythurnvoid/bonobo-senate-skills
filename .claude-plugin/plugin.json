@@ -1,0 +1,9 @@
+{
+	"name": "bonobo-senate",
+	"description": "Use the Bonobo Senate public API from an agent: set up an API key, list, read, write, and upload files.",
+	"author": {
+		"name": "raythurnvoid"
+	},
+	"homepage": "https://github.com/raythurnvoid/bonobo-senate-skills",
+	"repository": "https://github.com/raythurnvoid/bonobo-senate-skills"
+}
