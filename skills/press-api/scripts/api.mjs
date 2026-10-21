@@ -515,12 +515,12 @@ async function command_restore(args) {
 		...(onConflict ? { onConflict } : {}),
 		requestId,
 	});
-	// One job for each delete the paths came from. The jobs run one after another. Read them when they
-	// ended too: only the jobs name the items that came back with a new name or stayed in the Trash.
+	// One job for each delete the paths came from. The jobs run one after another. Only the jobs name the
+	// items that came back with a new name or stayed in the Trash. Read them only with --wait: jobs/get
+	// needs files:list, and restore alone needs only files:write.
 	const jobs = [];
-	const readJobs = values.wait || restored.isDone;
-	if (readJobs) for (const jobId of restored.jobIds) jobs.push(await wait_for_job(credentials, jobId));
-	print_json({ requestId, ...restored, ...(readJobs ? { jobs } : {}) });
+	if (values.wait) for (const jobId of restored.jobIds) jobs.push(await wait_for_job(credentials, jobId));
+	print_json({ requestId, ...restored, ...(values.wait ? { jobs } : {}) });
 	return restored.refused.length > 0 || jobs.some((job) => job.status !== "succeeded") ? 1 : 0;
 }
 
