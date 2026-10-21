@@ -11,6 +11,7 @@ All client rows below use POST. Caller names are defined in [auth](references/au
 | `/api/v1/files/stat` | POST | client | Key | `files:list` | none | [Files](references/files.md) |
 | `/api/v1/files/mkdir` | POST | client | Key | `files:write` | none | [Files](references/files.md) |
 | `/api/v1/files/delete` | POST | client | Personal key | `files:write` | none | [Files](references/files.md) |
+| `/api/v1/files/restore` | POST | client | Personal key | `files:write` | none | [Files](references/files.md) |
 | `/api/v1/files/move` | POST | client | Personal key | `files:write` | none | [Files](references/files.md) |
 | `/api/v1/files/copy` | POST | client | Personal key | `files:write`, `files:read`, `files:download` | none | [Files](references/files.md) |
 | `/api/v1/files/jobs/get` | POST | client | Personal key | `files:list` | none | [Files](references/files.md) |

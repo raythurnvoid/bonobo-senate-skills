@@ -25,13 +25,15 @@ Files:
                                   List a folder. --all follows every page.
   stat <path>...                  Say for each path: found (with its details), missing, or denied.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
-  rm <path>... [--wait]           Delete (archive) files and folders, like rm -r. The app Trash can restore them.
+  rm <path>... [--wait]           Delete (archive) files and folders, like rm -r. restore brings them back.
+  restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait]
+                                  Bring back deleted files and folders, with everything deleted with them.
   mv <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]
                                   Move or rename, like mv. An existing folder <to> takes the paths inside it.
                                   Otherwise <to> is the new path of the one path. --parents makes the folder above <to>.
   cp <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]
                                   Copy, like cp -r. Folders merge into an existing folder of the same name.
-  job <job id> [--wait]           Show a job that rm, mv, or cp started. --wait waits until it ends.
+  job <job id> [--wait]           Show a job that rm, restore, mv, or cp started. --wait waits until it ends.
   upload <local path>... --to <folder> [--overwrite replace|fail] [--skip-existing] [--include-hidden]
          [--skip-processing] [--wait] [--dry-run]
                                   Upload files and folders. A folder keeps its own name under --to.
@@ -489,6 +491,35 @@ async function command_rm(args) {
 	return deleted.refused.length > 0 || (job && job.status !== "succeeded") ? 1 : 0;
 }
 
+async function command_restore(args) {
+	const { values, positionals } = parseArgs({
+		args,
+		allowPositionals: true,
+		options: { "on-conflict": { type: "string" }, "request-id": { type: "string" }, wait: { type: "boolean" } },
+	});
+	check_workspace_paths(positionals);
+	const onConflict = values["on-conflict"];
+	if (onConflict !== undefined && !["keep_both", "skip"].includes(onConflict)) {
+		throw new UsageError("--on-conflict must be keep_both or skip.");
+	}
+
+	const credentials = load_credentials();
+	// The same request id returns the same jobs, so a rerun after a lost answer does not restore twice.
+	// Print it before the call, so it is there even when the answer is lost.
+	const requestId = values["request-id"] ?? crypto.randomUUID();
+	process.stderr.write(`Request id: ${requestId}\n`);
+	const restored = await post_json(credentials, "files/restore", {
+		paths: positionals,
+		...(onConflict ? { onConflict } : {}),
+		requestId,
+	});
+	// One job for each delete the paths came from. The jobs run one after another.
+	const jobs = [];
+	if (values.wait) for (const jobId of restored.jobIds) jobs.push(await wait_for_job(credentials, jobId));
+	print_json({ requestId, ...restored, ...(values.wait ? { jobs } : {}) });
+	return restored.refused.length > 0 || jobs.some((job) => job.status !== "succeeded") ? 1 : 0;
+}
+
 async function command_transfer(kind, args) {
 	const { values, positionals } = parseArgs({
 		args,
@@ -738,6 +769,7 @@ const commands = {
 	stat: command_stat,
 	mkdir: command_mkdir,
 	rm: command_rm,
+	restore: command_restore,
 	mv: (args) => command_transfer("move", args),
 	cp: (args) => command_transfer("copy", args),
 	job: command_job,

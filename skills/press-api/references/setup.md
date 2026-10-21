@@ -24,7 +24,7 @@ The script reads `T3_API_KEY` and `T3_API_ORIGIN` when `T3_API_KEY` is set. The 
 Do this only when the user asks for setup. No API route creates a key: only a signed-in user can, on the app's API keys page. Tell the user:
 
 1. Open the workspace in the app, then open **API keys** (`/w/<organization>/<workspace>/api-keys`).
-2. Create a personal key (not one bound to a service account) with only the scopes the task needs: `files:list` for `ls`, `stat`, and `job`; `files:read` to read text and for `cp`; `files:write` for `upload`, `mkdir`, `rm`, `mv`, `cp`, and writes; `files:download` for download URLs, byte reads, and `cp`.
+2. Create a personal key (not one bound to a service account) with only the scopes the task needs: `files:list` for `ls`, `stat`, and `job`; `files:read` to read text and for `cp`; `files:write` for `upload`, `mkdir`, `rm`, `restore`, `mv`, `cp`, and writes; `files:download` for download URLs, byte reads, and `cp`.
 3. Copy the key. The page shows it only once.
 4. Copy the API origin from the "Use an API key" section of the same page (the `T3_API_ORIGIN` value). It is not the app website address.
 
@@ -85,6 +85,7 @@ node <skill folder>/scripts/api.mjs ls /Inbox --all
 node <skill folder>/scripts/api.mjs stat /Inbox/a.md /Inbox/old
 node <skill folder>/scripts/api.mjs mkdir /Projects/2026/Q1 /Projects/2026/Q2
 node <skill folder>/scripts/api.mjs rm /Inbox/old /Inbox/tmp.md --wait
+node <skill folder>/scripts/api.mjs restore /Inbox/old --wait
 node <skill folder>/scripts/api.mjs mv /Inbox/a.md /Inbox/b.md /Projects/2026/Q1 --wait
 node <skill folder>/scripts/api.mjs mv /Projects/2026/Q1/a.md /Projects/2026/Q1/notes.md --wait
 node <skill folder>/scripts/api.mjs cp /Projects/2026/Q1 /Backup/2026/Q1 --parents --wait
@@ -93,7 +94,8 @@ node <skill folder>/scripts/api.mjs cp /Projects/2026/Q1 /Backup/2026/Q1 --paren
 - `ls [folder]` lists one page of 100. `--all` follows every page, `--recursive` walks the whole tree, and `--cursor` goes on from a page. A huge folder makes a huge `--all` answer, so page through it instead.
 - `stat` answers each path as `found` (with the same details as `ls`), `missing`, or `denied`. Exit 1 when any path is not found.
 - `mkdir` works like `mkdir -p`, all or nothing: one refused path makes no folder.
-- `rm` archives files and folders, like `rm -r`. The app Trash can restore them. It refuses a missing or locked path alone and deletes the rest. A big folder goes on in the background: `--wait` waits for the job, and `job <job id> --wait` reads it later. It needs a personal key.
+- `rm` archives files and folders, like `rm -r`. `restore` or the app Trash brings them back. It refuses a missing or locked path alone and deletes the rest. A big folder goes on in the background: `--wait` waits for the job, and `job <job id> --wait` reads it later. It needs a personal key.
+- `restore` brings back deleted files and folders, with everything the same `rm` deleted with them. An item comes back where it was, or at the workspace root when its folder is gone. When an item with the same name is there, it comes back with a new name such as `notes-2.md` (`--on-conflict keep_both`, the default); `--on-conflict skip` leaves it deleted. It refuses a path alone when nothing deleted is there, when the path was deleted more than once (restore that one in the app), or when it is locked. It prints `Request id: <id>` on stderr like `mv`; rerun with `--request-id <that id>` after a lost answer. `--wait` waits for every job. It needs a personal key with `files:write`.
 - `mv` and `cp` work like `mv` and `cp -r`. When the last path is an existing folder, the other paths go inside it. Otherwise there must be one path, and the last path is its new path: that is also how to rename. A new name must be clean, like in uploads ([upload](references/upload.md) step 2). A last path that ends with `/` must be an existing folder. Another path that ends with `/` must be a folder. The folder above a new path must exist; `--parents` makes it first. They refuse a missing or locked path alone and move or copy the rest. A file already at the destination stops a move (`--on-conflict error`, the default); a copy replaces it by default. `--on-conflict skip` keeps the existing file. Each call prints `Request id: <id>` on stderr before it sends anything. If the answer got lost, run the same command with `--request-id <that id>`: it returns the same job instead of starting a second one. `cp` needs a key with `files:read` and `files:download` too. Both need a personal key. A move that would make an item public needs `files:publish`. A move into, out of, or between restricted folders, or into a folder with added people, needs `files:permissions`. An item refused for a scope is listed in the job's `refused`, and the other items go on.
 
 ## 7. Log out
