@@ -4,13 +4,13 @@ Agent skills for Bonobo Senate.
 
 | Skill | What it does |
 | --- | --- |
-| [`press-api`](skills/press-api/SKILL.md) | Use the Bonobo Senate public API from your computer: set up an API key, then upload, list, read, write, make folders, and delete files with the `api.mjs` CLI. |
+| [`press-api`](skills/press-api/SKILL.md) | Use the Bonobo Senate public API from your computer: set up an API key, then upload, list, read, write, make folders, move, copy, and delete files with the `api.mjs` CLI. |
 
 The skills are plain folders with a `SKILL.md` file. Any agent that reads Agent Skills can use them.
 
 ## Install
 
-Pick the way that fits your agent. None of them needs an extra package.
+Pick the way that fits your agent. None of them needs an extra package. Use one way per agent: two ways can put two copies of the skill in the same agent, and the `skills` CLI replaces an existing `~/.claude/skills/press-api` link.
 
 ### Claude Code
 
@@ -79,11 +79,19 @@ Update: `git pull` in the clone.
 ### skills CLI (optional)
 
 ```sh
-pnpm dlx skills add raythurnvoid/bonobo-senate-skills -g -s press-api -y
+pnpm dlx skills add raythurnvoid/bonobo-senate-skills -g -s press-api -a claude-code -a codex -y
 ```
+
+Name your agents with `-a`. Without it, `-y` tries every agent the CLI knows, and some of them cannot take a user-level skill.
 
 Update: `pnpm dlx skills update -g`.
 
 ## API key
 
-The skill never ships a key. On first use it asks you to create one on the API keys page of your workspace and save it in `~/.config/bonobo-senate/credentials.json` with `node skills/press-api/scripts/api.mjs login --origin <api origin>`. Updates and reinstalls do not touch that file. See [setup](skills/press-api/references/setup.md).
+The skill never ships a key. On first use it asks you to create one on the API keys page of your workspace. Then you save it in `~/.config/bonobo-senate/credentials.json` with the `login` command. The script's place depends on how you installed the skill, so run `status` first: with no key, it prints the exact `login` command with the full path. For example, after the plain git install:
+
+```sh
+node ~/bonobo-senate-skills/skills/press-api/scripts/api.mjs status
+```
+
+Every install on the same computer uses the same key file. Updates and reinstalls do not touch it. See [setup](skills/press-api/references/setup.md).
