@@ -44,7 +44,7 @@ It asks for the key with a hidden prompt, checks it with `/api/v1/auth/verify`, 
 
 If you can open a terminal tab that the user types into, you may start the command there and let the user paste. Do not ask the user to send you the key. Run `status` again when the user is done.
 
-In a sandbox with a network allowlist (for example the Claude Code sandbox), the API origin's host must be allowed. The Codex sandbox blocks the network by default, so the user must turn network access on for the session. If requests fail with exit 3, tell the user. Do not move the key somewhere else to work around it.
+In a sandbox with a network allowlist (for example the Claude Code sandbox), the API origin's host must be allowed. `upload` also sends the file bytes to a storage host (a `*.r2.cloudflarestorage.com` name), so allow that host too. When it is blocked, each file fails with `Upload PUT failed: 0 cannot reach <host>: ...` and the file stays `pending`. A later `upload` with `--skip-existing` sends it again. The Codex sandbox blocks the network by default, so the user must turn network access on for the session. If requests fail with exit 3, tell the user. Do not move the key somewhere else to work around it.
 
 ## 4. Call a route
 

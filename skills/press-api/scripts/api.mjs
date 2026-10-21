@@ -631,7 +631,8 @@ async function command_upload(args) {
 						fetch(target.uploadUrl, { method: "PUT", headers: target.headers, body }).catch((error) => ({
 							ok: false,
 							status: 0,
-							statusText: String(error),
+							// The bytes go to a storage host, not the API origin. A sandbox allowlist needs this host too.
+							statusText: `cannot reach ${new URL(target.uploadUrl).host}: ${error.cause?.message ?? error.message}`,
 						}));
 					let response = await put();
 					// Try once more after a network error or a storage hiccup.
