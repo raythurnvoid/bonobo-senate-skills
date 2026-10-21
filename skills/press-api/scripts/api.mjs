@@ -26,7 +26,12 @@ Files:
   stat <path>...                  Say for each path: found (with its details), missing, or denied.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
   rm <path>... [--wait]           Delete (archive) files and folders, like rm -r. The app Trash can restore them.
-  job <job id> [--wait]           Show a job that rm started. --wait waits until it ends.
+  mv <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]
+                                  Move or rename, like mv. An existing folder <to> takes the paths inside it.
+                                  Otherwise <to> is the new path of the one path. --parents makes the folder above <to>.
+  cp <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]
+                                  Copy, like cp -r. Folders merge into an existing folder of the same name.
+  job <job id> [--wait]           Show a job that rm, mv, or cp started. --wait waits until it ends.
   upload <local path>... --to <folder> [--overwrite replace|fail] [--skip-existing] [--include-hidden]
          [--skip-processing] [--wait] [--dry-run]
                                   Upload files and folders. A folder keeps its own name under --to.
@@ -304,9 +309,20 @@ async function wait_for_job(credentials, jobId) {
 	const deadline = Date.now() + WAIT_TIMEOUT_MS;
 	while (true) {
 		const job = await post_json(credentials, "files/jobs/get", { jobId });
-		if (!ACTIVE_JOB_STATUSES.includes(job.status) || Date.now() > deadline) return job;
+		if (!ACTIVE_JOB_STATUSES.includes(job.status) || Date.now() > deadline) return await read_all_refused(credentials, job);
 		await sleep(WAIT_POLL_MS);
 	}
+}
+
+// A move or copy job returns its refused items a page at a time. Read the other pages too.
+async function read_all_refused(credentials, job) {
+	const refused = [...job.refused];
+	for (let cursor = job.refusedCursor; cursor; ) {
+		const page = await post_json(credentials, "files/jobs/get", { jobId: job.jobId, cursor });
+		refused.push(...page.refused);
+		cursor = page.refusedCursor;
+	}
+	return { ...job, refused, refusedCursor: null };
 }
 // #endregion requests
 
@@ -473,6 +489,48 @@ async function command_rm(args) {
 	return deleted.refused.length > 0 || (job && job.status !== "succeeded") ? 1 : 0;
 }
 
+async function command_transfer(kind, args) {
+	const { values, positionals } = parseArgs({
+		args,
+		allowPositionals: true,
+		options: {
+			"on-conflict": { type: "string" },
+			parents: { type: "boolean" },
+			"request-id": { type: "string" },
+			wait: { type: "boolean" },
+		},
+	});
+	if (positionals.length < 2) throw new UsageError(`Give at least one path and a destination.\n\n${USAGE}`);
+	check_workspace_paths(positionals);
+	const onConflict = values["on-conflict"];
+	if (onConflict !== undefined && !["error", "replace", "skip"].includes(onConflict)) {
+		throw new UsageError("--on-conflict must be error, replace, or skip.");
+	}
+	// A trailing "/" stays, like in mv: it says <to> must be an existing folder.
+	const to = positionals.at(-1);
+	const toPath = to.replace(/(?<=.)\/+$/u, "");
+
+	const credentials = load_credentials();
+	// The server makes no missing folders for a move or a copy. mkdir is fine with a folder that exists.
+	const folderToMake = toPath !== to ? toPath : toPath.slice(0, toPath.lastIndexOf("/"));
+	if (values.parents && folderToMake) await post_json(credentials, "files/mkdir", { paths: [folderToMake] });
+
+	// The same request id returns the same job, so a rerun after a lost answer does not move twice.
+	// Print it before the call, so it is there even when the answer is lost.
+	const requestId = values["request-id"] ?? crypto.randomUUID();
+	process.stderr.write(`Request id: ${requestId}\n`);
+	const started = await post_json(credentials, `files/${kind}`, {
+		from: positionals.slice(0, -1),
+		to,
+		...(onConflict ? { onConflict } : {}),
+		requestId,
+	});
+	// A rerun of a finished job answers isDone: true, so read the job anyway to show how it ended.
+	const job = values.wait && started.jobId ? await wait_for_job(credentials, started.jobId) : null;
+	print_json({ requestId, ...started, ...(job ? { job } : {}) });
+	return started.refused.length > 0 || (job && (job.status !== "succeeded" || job.refused.length > 0)) ? 1 : 0;
+}
+
 async function command_job(args) {
 	const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { wait: { type: "boolean" } } });
 	if (positionals.length !== 1) throw new UsageError(`Give one job id.\n\n${USAGE}`);
@@ -480,7 +538,7 @@ async function command_job(args) {
 	const credentials = load_credentials();
 	const job = values.wait
 		? await wait_for_job(credentials, positionals[0])
-		: await post_json(credentials, "files/jobs/get", { jobId: positionals[0] });
+		: await read_all_refused(credentials, await post_json(credentials, "files/jobs/get", { jobId: positionals[0] }));
 	print_json(job);
 	return ACTIVE_JOB_STATUSES.includes(job.status) || job.status === "succeeded" ? 0 : 1;
 }
@@ -680,6 +738,8 @@ const commands = {
 	stat: command_stat,
 	mkdir: command_mkdir,
 	rm: command_rm,
+	mv: (args) => command_transfer("move", args),
+	cp: (args) => command_transfer("copy", args),
 	job: command_job,
 	upload: command_upload,
 	call: command_call,
