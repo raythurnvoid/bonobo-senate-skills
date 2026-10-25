@@ -73,9 +73,11 @@ Delete cancels pending placeholders or archives committed output. Archive-destin
 The next routes use the service-secret header and that verified installation connection:
 
 - `/api/v1/plugins/members/list`: `{ installationId, cursor: null, startRevision: null }` starts a snapshot. It returns up to 50 `members`, `startRevision`, `currentRevision`, and `continueCursor`. Preserve the returned start revision and follow its cursor until null.
-- `/api/v1/plugins/access/changes`: `{ installationId, afterRevision, limit }`, with limit 1–100. It returns ordered `events`, `currentRevision`, `continueRevision`, and `isDone`. Continue from `continueRevision`.
+- `/api/v1/plugins/access/changes`: `{ installationId, afterRevision, limit }`, with limit 1–100. It returns ordered `events`, `currentRevision`, `continueRevision`, and `isDone`. The page holds only this installation's events, so revisions have gaps. Continue from `continueRevision`.
 
-Both require accepted service-connect and member-read capabilities. Stale history returns 410 and needs a new snapshot. Removed installations return terminal information. The external service must enforce lease expiry on its own live reads too.
+Both require accepted service-connect and member-read capabilities. Changes are kept 30 days. A stale cursor that missed a change of this installation returns `410 { code: "snapshot_required" }` and needs a new snapshot. Removed installations return terminal information. The external service must enforce lease expiry on its own live reads too.
+
+A plugin that declares the `workspace.access.changed` event and a `serviceEventsUrl` gets a signed POST there when its installation's access changes. The notice is `{ type, timestamp, data: { installationId, revision } }` and holds no member data: pull `access/changes` after it. Notices follow Standard Webhooks v1 (`webhook-id`, `webhook-timestamp`, `webhook-signature`). `/api/v1/plugins/service-events/key` takes `{ pluginName }` and the service secret, and returns `{ key: "whsec_...", createdAt }`. Answer 2xx when caught up, or 503 with `Retry-After` while catching up. The SDK README has the full contract and a verify recipe.
 
 ## Volumes, invocation, and follow-ups
 

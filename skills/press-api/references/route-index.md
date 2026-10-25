@@ -57,6 +57,7 @@ All client rows below use POST. Caller names are defined in [auth](references/au
 | `/api/v1/plugins/identity/exchange` | POST | client | Frame and Registered service | none | Service secret | [Runtime](references/plugin-runtime.md) |
 | `/api/v1/plugins/members/list` | POST | client | Registered service connection | none | Service secret | [Runtime](references/plugin-runtime.md) |
 | `/api/v1/plugins/access/changes` | POST | client | Registered service connection | none | Service secret | [Runtime](references/plugin-runtime.md) |
+| `/api/v1/plugins/service-events/key` | POST | client | Registered service | none | Service secret | [Runtime](references/plugin-runtime.md) |
 | `/api/v1/plugins/service-grants/exchange` | POST | client | Frame and Registered service | registered scopes | Service secret | [Runtime](references/plugin-runtime.md) |
 | `/api/v1/plugins/service-grants/recover` | POST | client | Original Frame or Service grant | registered scopes | Service secret | [Runtime](references/plugin-runtime.md) |
 | `/api/v1/plugins/service-grants/renew` | POST | client | Service grant | registered scopes | Service secret | [Runtime](references/plugin-runtime.md) |
