@@ -36,7 +36,7 @@ Success is `{ jobIds, isDone, refused: [{ path, message }] }`. There is one job 
 - The folder above a new `to` path must exist: 409 otherwise. Make it with `mkdir` first. A file in the way is 409 too, and a locked `to` or folder above is 403. A new name must be clean, like in `write` and `upload-urls`: 400 says the name to use instead. The API never renames on its own.
 - A missing or locked `from` path is refused alone, like in `delete`, and the rest goes on. When nothing is left, `jobId` is `null`.
 - `onConflict` says what happens when a file is already at the destination: `error` (the default for `move`) stops the whole job before it changes anything, `replace` (the default for `copy`) replaces that file, and `skip` keeps it. A copied folder merges into a folder of the same name. Moving a folder onto an existing folder is an error, or is skipped with `skip`.
-- A move keeps the rules of the app, and the key's own scopes come on top. A move that would make an item public on the web needs `files:publish`; an item that was already public through another public folder does not. A move into, out of, or between restricted folders, or into a folder with added people, needs `files:permissions`. Such an item is refused alone: it shows in the job's `refused` list with a message that names it, and the other items go on.
+- A move keeps the rules of the app, and the key's own scopes come on top. A move never makes an item public. A move into, out of, or between restricted folders, or into a folder with added people, needs `files:permissions`. Such an item is refused alone: it shows in the job's `refused` list with a message that names it, and the other items go on.
 
 Success is `{ jobId, isDone, refused: [{ path, message }] }`. The job goes on in the background; read it with `jobs/get`. Send the same `requestId` and body again after a lost answer: you get the same `jobId` back, also after the job has finished, and nothing runs twice. The same `requestId` with another body is 409. A person runs one move or copy at a time per workspace, including ones started in the app: a second one is 409 until the first ends. 429 means too many changes in a row; wait (`retryAfterMs` when it is there) and send the same request again.
 
@@ -80,12 +80,12 @@ Names have at most 255 characters; new paths have at most 1,024. One action can 
 
 `write-policy/get` takes `{ nodeId }`. `write-policy/set` takes `{ nodeId, writePolicy }`. Policies are `null`, `{ mode: "read_only" }`, or `{ mode: "writer", writers: [...] }`. A writer is `{ kind: "user", userId }` or `{ kind: "service_account", serviceAccountId }`. A writer list must contain one or more different active writers. Setting policy requires management permission on that target; a scope alone is insufficient.
 
-## Anyone on the web
+## Public flag
 
-`public/set` takes `{ nodeId, public }`, where `public` is a boolean. Success is `{ nodeId, public: "on" | "inherited" | "off" }`. It needs `files:publish` and a personal key. A public file, or a file inside a public folder down to the nearest restricted folder, can show as an image or video on public link pages. A restricted folder inside stays off. It never opens the file by ID. Turning it on needs management and read permission on the target; turning it off needs management. A scope alone is insufficient.
+`public/set` takes `{ nodeId, public }`, where `public` is a boolean. Success is `{ nodeId, public }`. It needs `files:publish` and a personal key. A public image or video file can show inside public link pages. Only files have the flag; a folder gets 400. It never opens the file by ID. Both On and Off need edit permission on the file, and On also needs read. A scope alone is insufficient.
 
-- `inherited` means a public folder above makes the item public. Turning such an item off returns 403; turn it off on that folder.
+- A move into another restricted area, a restrict, or an unrestrict turns the flag off. A copy starts off.
 - Repeating the current value changes nothing.
-- 400: bad body. 401: the key or its membership is unavailable. 404: missing, archived, or not managed by the key's user, or not readable for On. 409 (turning on only): the item is being moved, or an access change of the item or a folder above is still running; retry later. 429: too many Sharing changes; wait `retryAfterMs`. 403: other refusals, such as a plugin-bound folder.
+- 400: bad body, or a folder. 401: the key or its membership is unavailable. 404: missing, archived, or not editable by the key's user, or not readable for On. 409 (turning on only): the item is being moved, or an access change of the item or a folder above is still running; retry later. 429: too many Sharing changes; wait `retryAfterMs`. 403: other refusals, such as a plugin-bound folder.
 
 Plugin conditional writes, folder access, and sealed uploads have extra fields and retry rules. Read [plugin runtime](references/plugin-runtime.md) before using them. There is no public API to turn "Anyone with the link" share links on or off or retrieve their link tokens. That is separate from `public/set`.
