@@ -57,7 +57,7 @@ node <skill folder>/scripts/api.mjs call files/list '{"path":"/","cursor":null,"
 
 In Windows PowerShell 5.1, do not pass JSON as an argument: it removes the double quotes inside it before the script sees it. Use `--body-file <file>` with a UTF-8 JSON file. A pipe with `-` also works for plain ASCII, but PowerShell 5.1 turns other characters (such as `é`) into `?` in a pipe unless you first run `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`.
 
-- Success: the JSON response goes to stdout. A raw byte response (`files/read-bytes`) goes to stdout unchanged, or to a file with `--out <file>`, and its `X-File-*` headers (revision, size, offset) go to stderr as JSON. Use `--out` in Windows PowerShell 5.1: its `>` turns bytes into text.
+- Success: the JSON response goes to stdout. A raw byte response (`files/read`) goes to stdout unchanged, or to a file with `--out <file>`, and its `X-File-*` headers (type, revision, size, next cursor) go to stderr as JSON. Each call reads one page; follow the next cursor until it is absent. Use `--out` in Windows PowerShell 5.1: its `>` turns bytes into text.
 - Failure: `HTTP <status>: <message>` and the JSON error body go to stderr, with exit 1. On 429, `call` waits `retryAfterMs` and tries again, up to 5 times.
 
 ## 5. Upload files and folders

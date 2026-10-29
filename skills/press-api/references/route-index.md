@@ -15,11 +15,9 @@ All client rows below use POST. Caller names are defined in [auth](references/au
 | `/api/v1/files/move` | POST | client | Key | `files:write` | none | [Files](references/files.md) |
 | `/api/v1/files/copy` | POST | client | Key | `files:write`, `files:read`, `files:download` | none | [Files](references/files.md) |
 | `/api/v1/files/jobs/get` | POST | client | Key | `files:list` | none | [Files](references/files.md) |
-| `/api/v1/files/read` | POST | client | Key, Short grant, Frame, Run | `files:read` | none | [Files](references/files.md) |
-| `/api/v1/files/read-many` | POST | client | Key, Short grant | `files:read` | none | [Files](references/files.md) |
-| `/api/v1/files/read-bytes` | POST | client | Key, Short grant | `files:download` | none | [Files](references/files.md) |
-| `/api/v1/files/write-policy/get` | POST | client | Key | `files:read` | none | [Files](references/files.md) |
-| `/api/v1/files/write-policy/set` | POST | client | Key | `files:permissions` | none | [Files](references/files.md) |
+| `/api/v1/files/read` | POST | client | Key, Short grant, Frame, Run | Text: `files:read` (keys/grants also accept `files:download`); binary: `files:download`, Key or Short grant only | none | [Files](references/files.md) |
+| `/api/v1/files/read-only/get` | POST | client | Key | `files:read` | none | [Files](references/files.md) |
+| `/api/v1/files/read-only/set` | POST | client | Key | `files:read-only` | none | [Files](references/files.md) |
 | `/api/v1/files/public/set` | POST | client | Personal key | `files:publish` | none | [Files](references/files.md) |
 | `/api/v1/files/write` | POST | client | Key, Run, sealed Service grant | `files:write` | Service secret in writer mode | [Files](references/files.md) |
 | `/api/v1/files/write-many` | POST | client | Key | `files:write` | none | [Files](references/files.md) |

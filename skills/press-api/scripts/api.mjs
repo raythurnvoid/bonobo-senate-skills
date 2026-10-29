@@ -255,7 +255,7 @@ async function post(credentials, route, body) {
 		isJson,
 		bytes,
 		json: isJson ? JSON.parse(bytes.toString("utf8")) : null,
-		// files/read-bytes describes the saved file in these headers. Later ranges need the revision.
+		// files/read describes the saved file here. A next cursor continues the read.
 		fileHeaders: Object.fromEntries([...response.headers].filter(([name]) => name.startsWith("x-file-"))),
 	};
 }
@@ -428,7 +428,7 @@ async function command_call(args) {
 		return 1;
 	}
 
-	// JSON goes out readable. Raw bytes (files/read-bytes) go out unchanged, with their file headers on stderr.
+	// JSON goes out readable. Raw bytes (files/read) go out unchanged, with their file headers on stderr.
 	if (result.isJson) {
 		console.log(JSON.stringify(result.json, null, 2));
 	} else {

@@ -42,21 +42,21 @@ Success is `{ jobId, isDone, refused: [{ path, message }] }`. The job goes on in
 
 `jobs/get` takes `{ jobId, cursor? }` and answers `{ jobId, kind: "delete" | "restore" | "move" | "copy", status, progress, errorMessage, refused: [{ path, message }], renamed: [{ path, newPath }], refusedCursor }`. `status` is `queued`, `running`, `succeeded`, `partial` (some items were refused), `failed`, `timed_out`, or `canceled`. For a delete job, a refused `path` is `null` when the key can no longer read that item. A move or copy job keeps the paths it saw when it ran. A move, copy, or restore job gives its items 100 at a time: while `refusedCursor` is not `null`, call again with `cursor: <refusedCursor>`. The paths refused at the start come on the first page only. A copy skips a locked item inside a copied folder and lists it there with `Permission denied`. A delete job has all of them on one page. The last job of a restore lists the paths the restore refused. A restore job lists each item that Keep both brought back under a new name in `renamed`: `path` is where the item was when it was deleted, and `newPath` is where it came back. It lists each item that `skip` left in the Trash in `refused`, with the path it keeps there. A skip does not make the job `partial`. A job that still runs can list more items later, so read it again after it ends. Move and copy never rename, so their `renamed` is empty. When a restore job ends before it brought back everything (it stopped partway, for example because Keep both found no free name), its `refused` names one item still in the Trash. Fix the reason in `errorMessage`, then restore that path to bring back the rest of that delete. Only the key that started the job can read it; another key gets 404 `Job not found`. A finished job is deleted after 7 days, and then it is 404 too. If the key is revoked or loses a scope the job needs while the job still checks items, the job stops and `errorMessage` says so; a delete or move that already passed its check finishes. A restore stops even then.
 
-## Text and byte reads
+## Read saved text or binary files
 
-| Route suffix under `/api/v1/files/` | Body | Success |
-| --- | --- | --- |
-| `read` | `{ path, maxBytes? }` | `{ path, target: { kind: "saved", id }, content }` |
-| `read-many` | `{ paths, maxBytes? }` | `{ files: [{ path, target, content }], errors: [{ path, message }], truncated }` |
-| `read-bytes` | `{ path, offset, length, revision }` | Raw bytes and revision/size headers |
+POST `/api/v1/files/read` with `{ path, cursor: null }` for the first page. Only `path` and optional `cursor` are accepted. The server chooses the page size, up to 1,048,576 bytes. Success is raw bytes with `Content-Type: application/octet-stream` and `Cache-Control: no-store`, including for text or JSON files. Use `arrayBuffer()`, not `json()`.
 
-Text reads serve editable Markdown and plain text types. `read` returns a whole file up to 900,000 UTF-8 bytes; `maxBytes` can lower that limit. `read-many` accepts at most 50 paths per effective request, up to 128,000 bytes per file and 384,000 content bytes total. Extra paths or a reached content budget set `truncated`. Send smaller batches to recover the rest; use `read` for a file above the per-item limit. This is not cursor paging. Check `errors` even on HTTP 200.
+`X-File-Content-Type`, `X-File-Revision`, and `X-File-Size` describe the saved file. When `X-File-Next-Cursor` is present, send it unchanged with the same path for the next page. Stop when the header is absent. A short page alone does not mean EOF. An empty file returns 200 with an empty body and no next cursor. A cursor may be up to 16 KiB; do not inspect, trim, or edit it.
 
-`read` returns 403 `Permission denied: <path>` for locked paths. Missing or too-large content returns 404 `File not found or exceeds the read limit.` `read-many` reports those messages per path in `errors`.
+Editable text returns UTF-8 of the latest available saved version. It may lag the open editor. Keep one `TextDecoder` across pages, call `decode(bytes, { stream: true })` for each page, and call `decode()` once at EOF. This keeps characters split between pages intact. Parse JSON or Markdown only after collecting all needed pages.
 
-For exact saved bytes, use `read-bytes` with a canonical path, safe nonnegative integer `offset`, `length` from 1 through 1,048,576, and `revision: null` first. Read with `arrayBuffer()`, not `json()`. Save `X-File-Revision`, then pass it unchanged on later ranges. `X-File-Size`, `X-File-Offset`, and `X-File-Content-Type` describe the saved file. Editable text returns UTF-8 of saved Files text. An empty file or EOF returns an empty 200 body; an offset past EOF returns 416. Revision changes return 409. Errors are JSON. Locked paths return 403; missing files return 404 `File unavailable`.
+Errors are JSON with `message` and `errorCode`. Locked paths return 403; missing files return 404. An invalid cursor returns 400 `invalid_cursor`. A changed saved version returns 409 `file_changed`: discard collected pages and start with `cursor: null`. File size alone is never a 404. Access is checked again on every page.
 
-Short grants share an 8 MiB byte budget in one `execute_code` run, across current/personal. Requested lengths spend the budget before I/O. Failed calls and retries are not refunded. Ordinary keys have the range cap and rate limits without that per-run budget. Short grants never mint signed download URLs.
+Saved editable text needs `files:read` or `files:download` for keys and short grants. Binary files need `files:download`; plugins keep their existing text-read scope. Short grants share an 8 MiB read budget in one `execute_code` run, across current/personal. Each page reserves its actual planned bytes before I/O. Failed reads and retries are not refunded. Ordinary keys have the page cap and rate limits without that per-run budget. Short grants never mint signed download URLs.
+
+The CLI `call files/read` returns one page only. Its raw bytes go to stdout or `--out`; the file headers go to stderr as JSON. Follow the next cursor with another call. A preview client can stop after its first page and keep only the bytes it needs.
+
+TODO: consider streaming, an optional `pageBytes` hint, and a saved-version freshness signal when callers need them.
 
 ## Text writes and empty files
 
@@ -64,7 +64,7 @@ POST `/api/v1/files/write` with `{ path, content, overwrite?: "replace" | "fail"
 
 `write-many` takes `{ files: [{ path, content, overwrite?, nonCollaborative?, contentType? }], skipIfUnchanged? }`: at most 20 files and 8,000,000 request bytes. Success is `{ written: [...], errors: [{ path, message, errorCode }] }`. Body validation is for the whole request. Runtime writes have per-item results; do not assume the whole batch rolled back. A mid-batch lost credential (401) or a bad item (400) can stop the batch after earlier writes finished. Reconcile saved results before retrying.
 
-Writes save directly. Filling an editable file keeps its node ID. Replacing a stored binary file archives the old node and creates a new one. `overwrite: "fail"` returns 409 `A file already exists at this path`, also for a visible locked name. Overwriting a locked file, or writing any name below a locked folder, returns 403. A write policy can still refuse an otherwise allowed write.
+Writes save directly. Filling an editable file keeps its node ID. Replacing a stored binary file archives the old node and creates a new one. `overwrite: "fail"` returns 409 `A file already exists at this path`, also for a visible locked name. Overwriting a locked file, or writing any name below a locked folder, returns 403. Read-only can still refuse an otherwise allowed write.
 
 An omitted type uses the new name's type hint; an existing editable file keeps its stored type. A requested type must be editable and match an existing editable target. `nonCollaborative: true` chooses saved-text storage for a new file; it does not change an existing file's mode. `skipIfUnchanged` can avoid a needless fill. Text saves need available credits and charge a file-save event when content is published. `touch` has no credit gate or save charge.
 
@@ -76,9 +76,11 @@ Names have at most 255 characters; new paths have at most 1,024. One action can 
 
 `download-urls` takes `{ fileNodeIds, expiresInSeconds?, download? }`. Send at most 20 IDs to avoid clipping. Success has `items`, `errors`, and `truncated`; each item has its authorized URL and file facts. Maximum URL life is 900 seconds. `download: true` asks for attachment download. Check every per-ID error; a locked ID says `Permission denied`. URLs are temporary credentials. Do not publish or log them. Files scope checks remain separate from AI transcript access.
 
-## Local write policy
+## Local Read-only flag
 
-`write-policy/get` takes `{ nodeId }`. `write-policy/set` takes `{ nodeId, writePolicy }`. Policies are `null`, `{ mode: "read_only" }`, or `{ mode: "writer", writers: [...] }`. A writer is `{ kind: "user", userId }` or `{ kind: "service_account", serviceAccountId }`. A writer list must contain one or more different active writers. Setting policy requires management permission on that target; a scope alone is insufficient.
+`read-only/get` takes `{ nodeId }` and returns `{ nodeId, readOnly, canEdit }`. `read-only/set` takes `{ nodeId, readOnly }`, where `readOnly` is a boolean. Setting or clearing the flag needs `files:read-only` and current Can edit on the target. A scope alone grants no file access.
+
+The flag stops normal changes to that item. A folder's flag also guards its direct child list, but not content deeper inside. It is separate from sharing. Supported machine writes may send explicit `force: true` with `files:read-only` to pass the flag check. Force never grants access or clears the flag.
 
 ## Public flag
 

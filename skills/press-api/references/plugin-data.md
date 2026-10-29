@@ -28,7 +28,7 @@ Private store scopes remain private: unreadable documents look absent and scoped
 
 Follow `cursor` until `isDone`. Keep collection, installation, and all range fields unchanged. A cursor from another range returns 400. It is opaque client state, not an access grant. A short page does not prove completion. For a durable continuation, a client may instead send the last returned key as `keyStartExclusive` with `cursor: null`, while keeping the other bounds.
 
-`isDone` means the selected range ended. Files `read-many` and URL-batch `truncated` fields mean something different: send fewer inputs to avoid lost results. Store list paging has no HTTP count shortcut. Do not read a whole installation merely to count its documents.
+`isDone` means the selected range ended. URL-batch `truncated` fields mean something different: send fewer inputs to avoid lost results. Store list paging has no HTTP count shortcut. Do not read a whole installation merely to count its documents.
 
 ## Service-owned versions and reservations
 
