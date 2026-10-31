@@ -25,7 +25,7 @@ Files:
                                   List a folder. --all follows every page.
   stat <path>...                  Say for each path: found (with its details), missing, or denied.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
-  rm <path>... [--wait]           Delete (archive) files and folders, like rm -r. restore brings them back.
+  rm <path>... [--wait]           Move files and folders to Trash, like rm -r. restore brings them back.
   restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait]
                                   Bring back deleted files and folders, with everything deleted with them.
   mv <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]

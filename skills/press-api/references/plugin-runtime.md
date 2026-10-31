@@ -44,7 +44,7 @@ Inspect returns `nodeId`, bounded `content`, `contentType`, `contentRevision`, `
 
 For `/api/v1/files/write`, supply normal text fields, required `expectedParentNodeId`, and `writer: { writerId, operationId, writerGeneration, sequence, expectedNodeId, expectedContentRevision, expectedReaderRevision, contentHash }`. `contentHash` is the SHA-256 hex of normalized content: drop one leading BOM and change CRLF or lone CR to LF before hashing. Preserve inspected revisions and exact target IDs. Writer mode derives create/replace from the expected target, and refuses conflicting overwrite or `skipIfUnchanged: true`. Normalization and create options are part of the replay proof; keep them unchanged on retry.
 
-Save operation IDs before calls and save receipts after success. Exact retries return the committed receipt. A changed replay, old sequence, old generation, changed content, or changed reader revision can return 409. Advance moves exactly one generation. Archive pins one exact node, so a replacement at the same path is not archived by a stale call. Ordinary sealed archive without writer conditions archives one matching file; invoke archive may cover up to 256 nodes.
+Save operation IDs before calls and save receipts after success. Exact retries return the committed receipt. A changed replay, old sequence, old generation, changed content, or changed reader revision can return 409. Advance moves exactly one generation. `plugin-archive` pins one exact node, so a stale call cannot move a replacement at the same path to Trash. An ordinary sealed call without writer conditions moves one matching file to Trash; an invoke call may cover up to 256 nodes.
 
 Undo takes exactly one of `receiptId` or `originalReaderOperationId`; its own operation ID must differ from the original. It reverses only the recorded reader change, not arbitrary sharing. Keep the original bearer until the external change finishes. Recorded proof can allow this narrow undo after bearer expiry, rotation, or actor access loss, while current installation/account/service/policy checks still apply. Lost responses can be canceled by original operation ID. A detached binding returns `restored: false` without a sharing change. Newer reader/writer state conflicts. Replace saved proof only after 401 `code: "reader_proof_mismatch"`, not after a network error or another refusal.
 
@@ -64,7 +64,7 @@ Keep both keys stable. A changed create replay is 409. A path must be canonical 
 
 PUT the full file using the returned URL and required headers, without the API bearer. Remint starts a fresh attempt; it is not byte-range resume. Finalize is safe to poll through normal rate limits. A current lock does not cancel an already accepted upload. A moved-out target, released target, closed destination, or changed live access can still refuse the service. Never treat an old URL or a same-path replacement as the same target.
 
-Delete cancels pending placeholders or archives committed output. Archive-destination archives up to 256 nodes in the bound destination. Both keep current access and policy checks. Neither refunds storage or billing. Save each result; a failed later item does not undo earlier accepted uploads.
+`delete` cancels pending placeholders or moves committed output to Trash. `archive-destination` moves up to 256 nodes in the bound destination to Trash. Both keep current access and policy checks. Neither refunds storage or billing. Save each result; a failed later item does not undo earlier accepted uploads.
 
 ## Identity and member access
 
