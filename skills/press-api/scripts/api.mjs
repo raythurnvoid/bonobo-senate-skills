@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.1.1";
+const VERSION = "1.1.2";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -42,7 +42,7 @@ Files:
                                   restricted folder. --all follows every page.
   restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait] [--dry-run]
   restore --node <node id>:<archive operation id>... [same options]
-                                  Bring back deleted files and folders, with everything deleted with them.
+                                  Bring back each item and the items inside it that were moved to Trash with it.
                                   --node picks one item from trash, also when several have one path.
                                   --dry-run says what would happen and changes nothing.
   mv <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]
