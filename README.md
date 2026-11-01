@@ -4,7 +4,7 @@ Agent skills for Bonobo Senate.
 
 | Skill | What it does |
 | --- | --- |
-| [`press-api`](skills/press-api/SKILL.md) | Use the Bonobo Senate public API from your computer: set up an API key, then upload, list, read, write, make folders, move, copy, and delete files with the `api.mjs` CLI. |
+| [`press-api`](skills/press-api/SKILL.md) | Use the Bonobo Senate public API from your computer: set up an API key, then upload, list, read, write, edit, make folders, move, copy, and delete files with the `api.mjs` CLI. |
 
 The skills are plain folders with a `SKILL.md` file. Any agent that reads Agent Skills can use them.
 

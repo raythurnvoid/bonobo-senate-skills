@@ -2,6 +2,8 @@
 
 All client rows below use POST. Caller names are defined in [auth](references/auth.md). “Key” means personal or service key unless the row says personal. “Service secret” means `X-Bonobo-Service-Authorization: Bearer <registered secret>` in addition to the indicated bearer, except member/change reads, which use that header alone with an existing verified connection. A plugin token derives its installation; it cannot choose another installation in its body.
 
+Request bodies are strict. A field a route does not know returns 400 `invalid_input` with a message that names it, for example `Unknown request field "expectedRevison" in "files.2". Remove it.` Free-form values, such as a plugin document `value`, accept any fields.
+
 | Path | Method | Class | Callers | Scope | Extra auth | Guide |
 | --- | --- | --- | --- | --- | --- | --- |
 | `/api/v1/auth/verify` | POST | client | Key | none | none | [Auth](references/auth.md) |
@@ -21,6 +23,8 @@ All client rows below use POST. Caller names are defined in [auth](references/au
 | `/api/v1/files/public/set` | POST | client | Personal key | `files:publish` | none | [Files](references/files.md) |
 | `/api/v1/files/write` | POST | client | Key, Run, sealed Service grant | `files:write` | Service secret in writer mode | [Files](references/files.md) |
 | `/api/v1/files/write-many` | POST | client | Key | `files:write` | none | [Files](references/files.md) |
+| `/api/v1/files/edit` | POST | client | Key | `files:read` and `files:write` | none | [Files](references/files.md) |
+| `/api/v1/files/append` | POST | client | Key | `files:read` and `files:write` | none | [Files](references/files.md) |
 | `/api/v1/files/touch` | POST | client | Key, Run | `files:write` | none | [Files](references/files.md) |
 | `/api/v1/files/download-urls` | POST | client | Key, Run, Frame | `files:download` | none | [Files](references/files.md) |
 | `/api/v1/files/upload-urls` | POST | client | Key | `files:write` | none | [Files](references/files.md) |

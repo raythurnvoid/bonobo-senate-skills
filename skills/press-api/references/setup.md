@@ -99,6 +99,21 @@ node <skill folder>/scripts/api.mjs cp /Projects/2026/Q1 /Backup/2026/Q1 --paren
 - `restore` brings back deleted files and folders, with everything the same `rm` deleted with them. An item comes back where it was, or at the workspace root when its folder is gone. When an item with the same name is there, it comes back with a new name such as `notes-2.md` (`--on-conflict keep_both`, the default); `--on-conflict skip` leaves it deleted. Only the jobs name these items, so use `--wait` to see them: each job's `renamed` lists every item with its new path, and its `refused` lists the items that stayed deleted. Without `--wait`, read each job later with `job <job id>`. It takes at most 100 paths per call. If a job stops partway (for example Keep both found no free name), the job's `refused` names a path still in the Trash: fix the reason the job gives, then restore that path to bring back the rest. It refuses a path alone when nothing deleted is there, when the path was deleted more than once (restore that one in the app), or when it is locked. It prints `Request id: <id>` on stderr like `mv`; rerun with `--request-id <that id>` after a lost answer. `--wait` waits for every job. It needs a personal key with `files:write`; `--wait` and `job` need `files:list` too.
 - `mv` and `cp` work like `mv` and `cp -r`. When the last path is an existing folder, the other paths go inside it. Otherwise there must be one path, and the last path is its new path: that is also how to rename. A new name must be clean, like in uploads ([upload](references/upload.md) step 2). A last path that ends with `/` must be an existing folder. Another path that ends with `/` must be a folder. The folder above a new path must exist; `--parents` makes it first. They refuse a missing or locked path alone and move or copy the rest. A file already at the destination stops a move (`--on-conflict error`, the default); a copy replaces it by default. `--on-conflict skip` keeps the existing file. Each call prints `Request id: <id>` on stderr before it sends anything. If the answer got lost, run the same command with `--request-id <that id>`: it returns the same job instead of starting a second one. `cp` needs a key with `files:read` and `files:download` too. A key bound to a service account moves and copies only what the account itself may read and change. A move that would make an item public needs `files:publish`. A move into, out of, or between restricted folders, or into a folder with added people, needs `files:permissions`. An item refused for a scope is listed in the job's `refused`, and the other items go on.
 
-## 7. Log out
+## 7. Edit and append text
+
+```sh
+node <skill folder>/scripts/api.mjs edit /Notes/plan.md --old-file old.txt --new-file new.txt --if-revision <revision>
+node <skill folder>/scripts/api.mjs append /Notes/log.md --from line.txt --if-revision <revision>
+some-command | node <skill folder>/scripts/api.mjs append /Notes/log.md --from -
+```
+
+- `edit` replaces the one place in the file that matches the text of `--old-file`. `append` adds the text of `--from` at the end, with no added newline; `-` reads stdin. The rules are in [Files](references/files.md#edit-and-append-text).
+- The local files are read as UTF-8 and sent byte for byte, with no BOM removed and no newline added. Put the exact text in a file, because shells change quotes, spaces, and line endings in arguments. A file that is not valid UTF-8 is a usage error (exit 2).
+- `--if-revision` takes the `X-File-Revision` of your last read (`call files/read` prints it on stderr). The change is then refused if the file changed since.
+- Success prints `{ path, nodeId, contentType, revision, size, contentChanged }`. When `contentChanged` is true, a note on stderr says the saved text is not exactly your change: read the file to check.
+- The command never sends the change twice by itself; only a 429 waits and tries again. On a 409, such as `text_not_found` or `file_changed`, it says to read the file and run the command again. When the API cannot be reached (exit 3), the change may be saved anyway: read the file before you run the command again, or an append can happen twice.
+- The key needs `files:read` and `files:write`.
+
+## 8. Log out
 
 `logout` deletes the saved key file. It does not revoke the key. Tell the user to revoke it on the API keys page too.

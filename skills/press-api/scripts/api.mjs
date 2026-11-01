@@ -38,6 +38,14 @@ Files:
          [--skip-processing] [--wait] [--dry-run]
                                   Upload files and folders. A folder keeps its own name under --to.
                                   Hidden files and folders (names that start with ".") are skipped.
+  edit <path> --old-file <file> --new-file <file> [--if-revision <revision>]
+                                  Replace the one place in a text file that matches the old text.
+  append <path> --from <file | -> [--if-revision <revision>]
+                                  Add text at the end of a text file. No newline is added. - reads stdin.
+                                  edit and append read local files as UTF-8 and send every byte unchanged.
+                                  --if-revision takes X-File-Revision from your last read. The change then
+                                  fails if the file changed since. Send it when you may run the command
+                                  again: a second run without it can append twice.
 
 Any route:
   call <route> [json | - | --body-file <file>] [--out <file>]
@@ -222,11 +230,27 @@ function read_hidden(prompt) {
 	});
 }
 
-async function read_stdin() {
+async function read_stdin_bytes() {
 	const chunks = [];
 	for await (const chunk of process.stdin) chunks.push(chunk);
+	return Buffer.concat(chunks);
+}
+
+async function read_stdin() {
 	// Windows PowerShell puts a UTF-8 BOM in front of text it pipes to a program. JSON.parse refuses it.
-	return Buffer.concat(chunks).toString("utf8").replace(/^﻿/u, "");
+	return (await read_stdin_bytes()).toString("utf8").replace(/^﻿/u, "");
+}
+
+/**
+ * Read a local file, or stdin for "-", as strict UTF-8. Keep every byte, including a leading BOM.
+ */
+async function read_utf8_text(file) {
+	const bytes = file === "-" ? await read_stdin_bytes() : fs.readFileSync(file);
+	try {
+		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+	} catch {
+		throw new UsageError(`Not valid UTF-8 text: ${file}`);
+	}
 }
 // #endregion credentials
 
@@ -763,6 +787,55 @@ async function command_upload(args) {
 	print_json({ uploaded, skipped, skippedHidden: hiddenCount, failed, ...(values.wait ? { pending } : {}) });
 	return failed.length > 0 || pending.length > 0 ? 1 : 0;
 }
+
+async function command_change(kind, args) {
+	const isEdit = kind === "edit";
+	const { values, positionals } = parseArgs({
+		args,
+		allowPositionals: true,
+		options: {
+			...(isEdit
+				? { "old-file": { type: "string" }, "new-file": { type: "string" } }
+				: { from: { type: "string" } }),
+			"if-revision": { type: "string" },
+		},
+	});
+	if (positionals.length !== 1 || (isEdit ? !values["old-file"] || !values["new-file"] : !values.from)) {
+		throw new UsageError(
+			`Give one workspace path and ${isEdit ? "--old-file and --new-file" : "--from"}.\n\n${USAGE}`,
+		);
+	}
+	check_workspace_paths(positionals);
+	const body = {
+		path: positionals[0],
+		...(isEdit
+			? { oldText: await read_utf8_text(values["old-file"]), newText: await read_utf8_text(values["new-file"]) }
+			: { content: await read_utf8_text(values.from) }),
+		...(values["if-revision"] !== undefined ? { expectedRevision: values["if-revision"] } : {}),
+	};
+
+	// Never send the change again by itself. After a lost answer it may already be saved, and an append
+	// would then happen twice. post_with_retry only waits and retries on 429, which saves nothing.
+	const result = await post_with_retry(load_credentials(), `files/${kind}`, body).catch((error) => {
+		if (error instanceof NetworkError) {
+			throw new NetworkError(`${error.message} The ${kind} may be saved. Read the file before you run it again.`);
+		}
+		throw error;
+	});
+	if (!result.ok) {
+		const error = new ApiError(result);
+		if (result.status === 409) error.message += " Read the file and run the command again.";
+		throw error;
+	}
+
+	if (result.json.contentChanged) {
+		process.stderr.write(
+			"Note: the saved text is not exactly your change. Someone's unsaved typing or the editor's format is in it. Read the file to check.\n",
+		);
+	}
+	print_json(result.json);
+	return 0;
+}
 // #endregion commands
 
 const [command, ...rest] = process.argv.slice(2);
@@ -779,6 +852,8 @@ const commands = {
 	cp: (args) => command_transfer("copy", args),
 	job: command_job,
 	upload: command_upload,
+	edit: (args) => command_change("edit", args),
+	append: (args) => command_change("append", args),
 	call: command_call,
 };
 

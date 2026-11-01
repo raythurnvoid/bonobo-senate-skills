@@ -13,7 +13,7 @@ Read resource paths relative to this skill folder. A skill does not give you cre
 The helper CLI is [api.mjs](scripts/api.mjs). Run it by its full path: `node <this skill folder>/scripts/api.mjs <command>`. `help` lists every command.
 
 1. `status` checks the saved key. Exit 4 means there is no key: follow [setup](references/setup.md) steps 2 and 3, where the user saves one. Exit 3 means the API cannot be reached; the key may be fine.
-2. `ls /`, `stat <path>...`, `mkdir <path>...`, `rm <path>... --wait`, `restore <path>... --wait`, `mv <path>... <to> --wait`, `cp <path>... <to> --wait`.
+2. `ls /`, `stat <path>...`, `mkdir <path>...`, `rm <path>... --wait`, `restore <path>... --wait`, `mv <path>... <to> --wait`, `cp <path>... <to> --wait`, `edit <path> --old-file <file> --new-file <file>`, `append <path> --from <file>`. Add `--if-revision <revision>` to change a text file only if nobody changed it since your read.
 3. `upload <local folder or file>... --to /<folder> --dry-run`, then the same without `--dry-run`. Add `--wait` to wait until the files are ready, and `--skip-existing` to resume a stopped upload. Names must already be clean (lowercase, no spaces): see [upload](references/upload.md) step 2.
 4. `call <route> <json>` sends any route from the [route index](references/route-index.md).
 

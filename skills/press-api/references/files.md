@@ -46,7 +46,7 @@ Success is `{ jobId, isDone, refused: [{ path, message }] }`. The job goes on in
 
 POST `/api/v1/files/read` with `{ path, cursor: null }` for the first page. Only `path` and optional `cursor` are accepted. The server chooses the page size, up to 1,048,576 bytes. Success is raw bytes with `Content-Type: application/octet-stream` and `Cache-Control: no-store`, including for text or JSON files. Use `arrayBuffer()`, not `json()`.
 
-`X-File-Content-Type`, `X-File-Revision`, and `X-File-Size` describe the saved file. When `X-File-Next-Cursor` is present, send it unchanged with the same path for the next page. Stop when the header is absent. A short page alone does not mean EOF. An empty file returns 200 with an empty body and no next cursor. A cursor may be up to 16 KiB; do not inspect, trim, or edit it.
+`X-File-Content-Type`, `X-File-Revision`, and `X-File-Size` describe the saved file. The revision is an opaque string: do not parse it. Send it as `expectedRevision` to change the file only if nobody changed it since. Text files also get `X-File-Is-Latest`. `false` means someone is typing in the file and the saved text does not have their changes yet; a conditional change is refused until it does. When `X-File-Next-Cursor` is present, send it unchanged with the same path for the next page. Stop when the header is absent. A short page alone does not mean EOF. An empty file returns 200 with an empty body and no next cursor. A cursor may be up to 16 KiB; do not inspect, trim, or edit it.
 
 Editable text returns UTF-8 of the latest available saved version. It may lag the open editor. Keep one `TextDecoder` across pages, call `decode(bytes, { stream: true })` for each page, and call `decode()` once at EOF. This keeps characters split between pages intact. Parse JSON or Markdown only after collecting all needed pages.
 
@@ -60,13 +60,28 @@ TODO: consider streaming, an optional `pageBytes` hint, and a saved-version fres
 
 ## Text writes and empty files
 
-POST `/api/v1/files/write` with `{ path, content, overwrite?: "replace" | "fail", skipIfUnchanged?, nonCollaborative?, contentType? }`. Success includes `path`, `nodeId`, `contentType`, and optionally `unchanged`. Empty text is refused; use `touch` with `{ paths: [...] }` for up to eight empty editable files.
+POST `/api/v1/files/write` with `{ path, content, overwrite?: "replace" | "fail", skipIfUnchanged?, nonCollaborative?, contentType?, expectedRevision? }`. Success is `{ path, nodeId, contentType, revision, size, contentChanged }`, plus `unchanged: true` when nothing was saved. `revision` equals the `X-File-Revision` of the next read. Empty text is refused; use `touch` with `{ paths: [...] }` for up to eight empty editable files.
 
-`write-many` takes `{ files: [{ path, content, overwrite?, nonCollaborative?, contentType? }], skipIfUnchanged? }`: at most 20 files and 8,000,000 request bytes. Success is `{ written: [...], errors: [{ path, message, errorCode }] }`. Body validation is for the whole request. Runtime writes have per-item results; do not assume the whole batch rolled back. A mid-batch lost credential (401) or a bad item (400) can stop the batch after earlier writes finished. Reconcile saved results before retrying.
+`write-many` takes `{ files: [{ path, content, overwrite?, nonCollaborative?, contentType?, expectedRevision? }], skipIfUnchanged? }`: at most 20 files and 8,000,000 request bytes. Success is `{ written: [...], errors: [{ path, message, errorCode }] }`; each written item has the same fields as a `write` answer. Body validation is for the whole request. Then each file saves on its own: a failed file fails alone and is listed in `errors`. A mid-batch lost credential (401) or a bad item (400) can stop the batch after earlier writes finished. Reconcile saved results before retrying.
+
+The saved text is your text byte for byte, with one rule: line endings become LF and a leading BOM is removed, like in the app's text editor. `contentChanged: true` says this rule changed your text. `skipIfUnchanged` compares the saved bytes, so a change in spacing or line breaks alone is saved.
+
+`expectedRevision` makes the write conditional. The file must exist and still have that revision: a changed, moved, replaced, or deleted file returns 409 `file_changed`, and nothing is created. A matching revision while someone's typing is not saved yet (`X-File-Is-Latest: false`) returns 409 `file_not_latest`; read again later. It cannot be combined with `overwrite: "fail"`. Without `expectedRevision`, the server tries again by itself when someone types during the write, up to three times, then answers 409 `file_busy`. A file the app marks for repair returns 409 `file_needs_repair`. A locked path is refused before any revision check.
 
 Writes save directly. Filling an editable file keeps its node ID. Replacing a stored binary file moves the old node to Trash and creates a new one. `overwrite: "fail"` returns 409 `A file already exists at this path`, also for a visible locked name. Overwriting a locked file, or writing any name below a locked folder, returns 403. Read-only can still refuse an otherwise allowed write.
 
 An omitted type uses the new name's type hint; an existing editable file keeps its stored type. A requested type must be editable and match an existing editable target. `nonCollaborative: true` chooses saved-text storage for a new file; it does not change an existing file's mode. `skipIfUnchanged` can avoid a needless fill. Text saves need available credits and charge a file-save event when content is published. `touch` has no credit gate or save charge.
+
+## Edit and append text
+
+POST `/api/v1/files/edit` with `{ path, oldText, newText, expectedRevision?, force? }` replaces the one place where `oldText` matches. POST `/api/v1/files/append` with `{ path, content, expectedRevision?, force? }` adds `content` at the end; it adds no newline. Both need an API key with `files:read` and `files:write`, and read and write access to the file. Success has the same fields as a `write` answer. Every byte outside the change stays as it was.
+
+- The file must be an existing editable text file: a missing file is 404, a locked one 403, a folder or a stored file 400.
+- `oldText` must not be empty. The match is literal, with no trimming or patterns. No match is 409 `text_not_found`. More than one match, also overlapping ones, is 409 `text_not_unique`: add text around it so it matches once.
+- `oldText` equal to `newText`, or an empty `content`, saves nothing and answers `unchanged: true`. An edit may leave the file empty.
+- Text with a lone surrogate (not valid Unicode) is 400. The result follows the LF and BOM rule of `write`.
+- When someone is typing in the file, the change starts from their text in the editor, so the saved file has the editor's format. `contentChanged: true` says so; read the file to check.
+- `expectedRevision`, retries, and `file_busy` work like in `write`. Without `expectedRevision`, sending an append again after a lost answer can add the text twice. Send `expectedRevision` when you may send the request again.
 
 Names have at most 255 characters; new paths have at most 1,024. One action can add at most 32 new folders per path. Upload batches also limit distinct folder prefixes to 64. Split requests or use a nearer existing folder when a limit refuses a path. Conventional names such as `AGENTS.md` and `SKILL.md` are normalized at creation. Reads keep exact saved paths.
 
