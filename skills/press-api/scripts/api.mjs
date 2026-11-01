@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.1.3";
+const VERSION = "1.1.4";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -267,7 +267,15 @@ async function read_utf8_text(file) {
 	if (file !== "-" && !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) {
 		throw new UsageError(`Local file not found: ${file}`);
 	}
-	const bytes = file === "-" ? await read_stdin_bytes() : fs.readFileSync(file);
+	let bytes;
+	try {
+		bytes = file === "-" ? await read_stdin_bytes() : fs.readFileSync(file);
+	} catch (error) {
+		// The file check above passes for a file that another program holds open. Windows then refuses
+		// the read (EBUSY). That is a local mistake too.
+		if (!["EPERM", "EBUSY", "EACCES"].includes(error.code)) throw error;
+		throw new UsageError(`Cannot read ${file} (${error.code}). Close the program that holds it open, or check that you may read it.`);
+	}
 	try {
 		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 	} catch {
@@ -836,7 +844,18 @@ async function command_upload(args) {
 			Array.from({ length: UPLOAD_CONCURRENCY }, async () => {
 				for (let next = queue.shift(); next; next = queue.shift()) {
 					const { target, item } = next;
-					const body = await fs.promises.readFile(item.local);
+					// A file that cannot be read now (another program holds it open, or it was deleted after the
+					// list was made) fails alone like a failed PUT. A throw here would lose the report of the
+					// files that worked.
+					const body = await fs.promises.readFile(item.local).catch((error) => error);
+					if (body instanceof Error) {
+						failed.push({
+							...item,
+							message: `Cannot read the local file (${body.code ?? body.message}). Close the program that holds it open, or check that it still exists.`,
+						});
+						process.stderr.write(`Failed ${target.path}\n`);
+						continue;
+					}
 					const put = () =>
 						fetch(target.uploadUrl, { method: "PUT", headers: target.headers, body }).catch((error) => ({
 							ok: false,
