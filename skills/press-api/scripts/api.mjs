@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.0.1";
+const VERSION = "1.1.0";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -37,8 +37,14 @@ Files:
                                   Create a text file or replace its whole text. - reads stdin.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
   rm <path>... [--wait]           Move files and folders to Trash, like rm -r. restore brings them back.
-  restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait]
+  trash [--area <node id>] [--all] [--cursor <c>]
+                                  List what is in Trash, newest delete first. --area lists inside one
+                                  restricted folder. --all follows every page.
+  restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait] [--dry-run]
+  restore --node <node id>:<archive operation id>... [same options]
                                   Bring back deleted files and folders, with everything deleted with them.
+                                  --node picks one item from trash, also when several have one path.
+                                  --dry-run says what would happen and changes nothing.
   mv <path>... <to> [--on-conflict error|replace|skip] [--parents] [--request-id <id>] [--wait]
                                   Move or rename, like mv. An existing folder <to> takes the paths inside it.
                                   Otherwise <to> is the new path of the one path. --parents makes the folder above <to>.
@@ -545,25 +551,78 @@ async function command_rm(args) {
 	return deleted.refused.length > 0 || (job && job.status !== "succeeded") ? 1 : 0;
 }
 
+async function command_trash(args) {
+	const { values, positionals } = parseArgs({
+		args,
+		allowPositionals: true,
+		options: { area: { type: "string" }, all: { type: "boolean" }, cursor: { type: "string" } },
+	});
+	if (positionals.length > 0) throw new UsageError(`trash takes no paths. Use --area <node id>.\n\n${USAGE}`);
+
+	const credentials = load_credentials();
+	const items = [];
+	let cursor = values.cursor ?? null;
+	while (true) {
+		const page = await post_json(credentials, "files/trash/list", { areaNodeId: values.area ?? null, cursor });
+		items.push(...page.items);
+		cursor = page.cursor;
+		if (!values.all || cursor === null) break;
+	}
+	print_json({ items, cursor, isDone: cursor === null });
+}
+
 async function command_restore(args) {
 	const { values, positionals } = parseArgs({
 		args,
 		allowPositionals: true,
-		options: { "on-conflict": { type: "string" }, "request-id": { type: "string" }, wait: { type: "boolean" } },
+		options: {
+			node: { type: "string", multiple: true },
+			"on-conflict": { type: "string" },
+			"request-id": { type: "string" },
+			wait: { type: "boolean" },
+			"dry-run": { type: "boolean" },
+		},
 	});
-	check_workspace_paths(positionals);
+	// Take paths or --node, like the route: never both.
+	const nodes = (values.node ?? []).map((value) => {
+		const [nodeId, archiveOperationId, ...rest] = value.split(":");
+		if (!nodeId || !archiveOperationId || rest.length > 0) {
+			throw new UsageError(`--node must be <node id>:<archive operation id> from trash, not: ${value}`);
+		}
+		return { nodeId, archiveOperationId };
+	});
+	if (nodes.length > 0 && positionals.length > 0) throw new UsageError("Give paths or --node, not both.");
+	if (nodes.length === 0) check_workspace_paths(positionals);
 	const onConflict = values["on-conflict"];
 	if (onConflict !== undefined && !["keep_both", "skip"].includes(onConflict)) {
 		throw new UsageError("--on-conflict must be keep_both or skip.");
 	}
+	// A dry run saves nothing, so it has no request id and no job to wait for.
+	if (values["dry-run"] && (values.wait || values["request-id"] !== undefined)) {
+		throw new UsageError("--dry-run takes no --wait and no --request-id.");
+	}
+	const selection = nodes.length > 0 ? { nodes } : { paths: positionals };
 
 	const credentials = load_credentials();
+	if (values["dry-run"]) {
+		const preview = await post_json(credentials, "files/restore", {
+			...selection,
+			...(onConflict ? { onConflict } : {}),
+			dryRun: true,
+		});
+		print_json(preview);
+		// A job can succeed and still leave items in the Trash, for example with --on-conflict skip.
+		return preview.refused.length > 0 ||
+			preview.jobs.some((job) => job.status !== "succeeded" || job.refused.length > 0)
+			? 1
+			: 0;
+	}
 	// The same request id returns the same jobs, so a rerun after a lost answer does not restore twice.
 	// Print it before the call, so it is there even when the answer is lost.
 	const requestId = values["request-id"] ?? crypto.randomUUID();
 	process.stderr.write(`Request id: ${requestId}\n`);
 	const restored = await post_json(credentials, "files/restore", {
-		paths: positionals,
+		...selection,
 		...(onConflict ? { onConflict } : {}),
 		requestId,
 	});
@@ -573,7 +632,9 @@ async function command_restore(args) {
 	const jobs = [];
 	if (values.wait) for (const jobId of restored.jobIds) jobs.push(await wait_for_job(credentials, jobId));
 	print_json({ requestId, ...restored, ...(values.wait ? { jobs } : {}) });
-	return restored.refused.length > 0 || jobs.some((job) => job.status !== "succeeded") ? 1 : 0;
+	return restored.refused.length > 0 || jobs.some((job) => job.status !== "succeeded" || job.refused.length > 0)
+		? 1
+		: 0;
 }
 
 async function command_transfer(kind, args) {
@@ -974,6 +1035,7 @@ const commands = {
 	stat: command_stat,
 	mkdir: command_mkdir,
 	rm: command_rm,
+	trash: command_trash,
 	restore: command_restore,
 	mv: (args) => command_transfer("move", args),
 	cp: (args) => command_transfer("copy", args),

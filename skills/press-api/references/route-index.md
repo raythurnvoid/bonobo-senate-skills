@@ -14,6 +14,7 @@ Request bodies are strict. A field a route does not know returns 400 with a mess
 | `/api/v1/files/mkdir` | POST | client | Key | `files:write` | none | [Files](files.md) |
 | `/api/v1/files/delete` | POST | client | Key | `files:write` | none | [Files](files.md) |
 | `/api/v1/files/restore` | POST | client | Personal key | `files:write` | none | [Files](files.md) |
+| `/api/v1/files/trash/list` | POST | client | Personal key | `files:list` | none | [Files](files.md) |
 | `/api/v1/files/move` | POST | client | Key | `files:write` | none | [Files](files.md) |
 | `/api/v1/files/copy` | POST | client | Key | `files:write`, `files:read`, `files:download` | none | [Files](files.md) |
 | `/api/v1/files/jobs/get` | POST | client | Key | `files:list` | none | [Files](files.md) |
