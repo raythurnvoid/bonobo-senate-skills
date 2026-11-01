@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -831,7 +831,8 @@ async function command_read(args) {
 	const credentials = load_credentials();
 
 	// With --to, write a new file next to the target and rename it at the end, so a failed read keeps
-	// the old file. "wx" refuses to open a file that is already there, so we only ever delete our own file.
+	// the old file. "wx" refuses to open a file that is already there, so the CLI only ever deletes
+	// its own file.
 	const tempPath = target === undefined ? null : `${target}.${crypto.randomUUID().slice(0, 8)}.part`;
 	let tempFd = tempPath === null ? null : fs.openSync(tempPath, "wx");
 
@@ -946,8 +947,8 @@ async function command_change(kind, args) {
 	});
 	if (!result.ok) {
 		const error = new ApiError(result);
-		// Only these refusals pass after a new read. file_changed and file_not_latest already say what to
-		// do, and running again does not help for others, such as file_needs_repair or Read-only.
+		// Only these refusals can succeed after a new read. file_changed and file_not_latest already say
+		// what to do, and running again does not help for others, such as file_needs_repair or Read-only.
 		if (result.status === 409 && ["file_busy", "text_not_found", "text_not_unique"].includes(result.json?.errorCode)) {
 			error.message += " Read the file and run the command again.";
 		}
@@ -956,7 +957,7 @@ async function command_change(kind, args) {
 
 	if (result.json.contentChanged) {
 		process.stderr.write(
-			"Note: the saved text is not exactly your change. Line endings became LF, a leading BOM was removed, or it holds someone's unsaved typing in the editor's format. Read the file to check.\n",
+			"Note: the saved text is not exactly what you sent. Line endings became LF, a leading BOM was removed, or it holds someone's unsaved typing in the editor's format. Read the file to check.\n",
 		);
 	}
 	print_json(result.json);

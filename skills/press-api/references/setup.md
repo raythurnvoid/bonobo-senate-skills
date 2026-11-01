@@ -94,7 +94,7 @@ node <skill folder>/scripts/api.mjs cp /Projects/2026/Q1 /Backup/2026/Q1 --paren
 
 - `ls [folder]` lists one page of 100. `--all` follows every page, `--recursive` walks the whole tree, and `--cursor` goes on from a page. A huge folder makes a huge `--all` answer, so page through it instead.
 - `stat` answers each path as `found` (with the same details as `ls`), `missing`, or `denied`. Exit 1 when any path is not found. `--expect missing` (or `found`, or `denied`) changes the test: exit 0 when every path has that status, else 1. The JSON is the same.
-- Exit 1 can also mean that the API refused the request. Then stdout has no `{ items }` JSON, so a script must check for it, not only the exit code. No `items` never means `missing`:
+- Exit 1 can also mean that the API refused the request. Then stdout has no `{ items }` JSON, so a script must check for it, not only the exit code. Without `items`, the paths are not known to be missing:
 
   ```sh
   out=$(node <skill folder>/scripts/api.mjs stat /Inbox/new.md --expect missing)
@@ -129,8 +129,8 @@ To change a file without losing someone else's change, follow [change a text fil
 - `edit` replaces the one place in the file that matches the text of `--old-file`. `append` adds the text of `--from` at the end, with no added newline; `-` reads stdin. The rules are in [Files](files.md#edit-and-append-text).
 - `write`, `edit` and `append` read the local files as UTF-8 and send them byte for byte, with no BOM removed and no newline added. The server then applies its save rule (LF line endings, no leading BOM). Put the exact text in a file, because shells change quotes, spaces, and line endings in arguments. A file that is not valid UTF-8 is a usage error (exit 2); use `upload` for binary files.
 - `--if-revision` takes the `revision` of your last `read`. The change is then refused if the file changed since.
-- Success prints `{ path, nodeId, contentType, revision, size, contentChanged }`. When `contentChanged` is true, a note on stderr says the saved text is not exactly your text: read the file to check.
-- The commands never send a change twice by themselves; only a 429 waits and tries again. A 409 `file_busy`, `text_not_found` or `text_not_unique` says to read the file and run the command again. Other 409s, such as `file_changed`, keep the server's message: see the recipe for what to do. When the API cannot be reached or its answer is lost (exit 3), the change may be saved anyway: read the file before you run the command again, or an append can happen twice.
+- Success prints `{ path, nodeId, contentType, revision, size, contentChanged }`. When `contentChanged` is true, a note on stderr says the saved text is not exactly what you sent: read the file to check.
+- The commands never send a change twice by themselves; only a 429 waits and tries again. A 409 `file_busy`, `text_not_found` or `text_not_unique` says to read the file and run the command again. Other 409s, such as `file_changed`, print only the server's message: see the recipe for what to do. When the API cannot be reached or its answer is lost (exit 3), the change may be saved anyway: read the file before you run the command again, or an append can happen twice.
 - In Git Bash, set `MSYS_NO_PATHCONV=1` first, like for `upload` (step 5). Otherwise Git Bash changes workspace paths such as `/Notes/plan.md`.
 - Scopes: `read` needs `files:read` for text or `files:download` for binary files. `write` needs `files:write`. `edit` and `append` need `files:read` and `files:write`.
 
