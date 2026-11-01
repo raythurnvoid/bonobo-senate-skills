@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.1.4";
+const VERSION = "1.1.5";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -274,7 +274,9 @@ async function read_utf8_text(file) {
 		// The file check above passes for a file that another program holds open. Windows then refuses
 		// the read (EBUSY). That is a local mistake too.
 		if (!["EPERM", "EBUSY", "EACCES"].includes(error.code)) throw error;
-		throw new UsageError(`Cannot read ${file} (${error.code}). Close the program that holds it open, or check that you may read it.`);
+		throw new UsageError(
+			`Cannot read ${file} (${error.code}). Close the program that holds it open, or check that you may read it.`,
+		);
 	}
 	try {
 		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
@@ -907,6 +909,7 @@ async function command_read(args) {
 
 	// lstat also sees a link whose target is gone.
 	if (target !== undefined) {
+		if (target === "") throw new UsageError("--to needs a file name.");
 		const stats = fs.lstatSync(target, { throwIfNoEntry: false });
 		if (stats?.isDirectory() || stats?.isSymbolicLink()) {
 			throw new UsageError(`--to must name a file, not a folder or a link: ${target}`);

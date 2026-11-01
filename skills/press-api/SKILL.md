@@ -3,7 +3,7 @@ name: press-api
 description: Upload, list, read, and organize files in a Bonobo Senate workspace from your computer with an API key, through the public API and its helper CLI. Use it to bulk-upload folders, make folders, move, rename, copy, delete, list the Trash, or restore files, check paths, read files, call any /api/v1 route, work with plugin data, or read saved AI conversations. Inside the app, it covers the allowed Files reads in execute_code. It is a client guide, not a guide to changing the Bonobo Senate backend.
 compatibility: Node 22 or newer, and network access to the API origin.
 metadata:
-  version: "1.1.4"
+  version: "1.1.5"
 ---
 
 # Bonobo Senate API client
