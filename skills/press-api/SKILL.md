@@ -2,6 +2,8 @@
 name: press-api
 description: Upload, list, read, and organize files in a Bonobo Senate workspace from your computer with an API key, through the public API and its helper CLI. Use it to bulk-upload folders, make folders, move, rename, copy, delete, or restore files, check paths, read files, call any /api/v1 route, work with plugin data, or read saved AI conversations. Inside the app, it covers the allowed Files reads in execute_code. It is a client guide, not a guide to changing the Bonobo Senate backend.
 compatibility: Node 22 or newer, and network access to the API origin.
+metadata:
+  version: "1.0.0"
 ---
 
 # Bonobo Senate API client
@@ -10,10 +12,10 @@ Read resource paths relative to this skill folder. A skill does not give you cre
 
 ## On a computer: quick start
 
-The helper CLI is [api.mjs](scripts/api.mjs). Run it by its full path: `node <this skill folder>/scripts/api.mjs <command>`. `help` lists every command.
+The helper CLI is [api.mjs](scripts/api.mjs). Run it by its full path: `node <this skill folder>/scripts/api.mjs <command>`. `help` lists every command and shows the skill version, the same as `metadata.version` above.
 
 1. `status` checks the saved key. Exit 4 means there is no key: follow [setup](references/setup.md) steps 2 and 3, where the user saves one. Exit 3 means the API cannot be reached; the key may be fine.
-2. `ls /`, `stat <path>...`, `mkdir <path>...`, `rm <path>... --wait`, `restore <path>... --wait`, `mv <path>... <to> --wait`, `cp <path>... <to> --wait`, `edit <path> --old-file <file> --new-file <file>`, `append <path> --from <file>`. Add `--if-revision <revision>` to change a text file only if nobody changed it since your read.
+2. `ls /`, `stat <path>... [--expect missing]`, `read <path> --to <file>`, `write <path> --from <file>`, `mkdir <path>...`, `rm <path>... --wait`, `restore <path>... --wait`, `mv <path>... <to> --wait`, `cp <path>... <to> --wait`, `edit <path> --old-file <file> --new-file <file>`, `append <path> --from <file>`. Add `--if-revision <revision>` to change a text file only if nobody changed it since your read: see [change a text file safely](references/files.md#change-a-text-file-safely).
 3. `upload <local folder or file>... --to /<folder> --dry-run`, then the same without `--dry-run`. Add `--wait` to wait until the files are ready, and `--skip-existing` to resume a stopped upload. Names must already be clean (lowercase, no spaces): see [upload](references/upload.md) step 2.
 4. `call <route> <json>` sends any route from the [route index](references/route-index.md).
 

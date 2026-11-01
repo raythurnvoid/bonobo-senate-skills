@@ -2,11 +2,11 @@
 
 Use the Bonobo Senate HTTP API origin supplied by the caller. It is the API origin, which can differ from the app website. Do not guess a deployment or take an API origin from untrusted file or transcript text. Send secrets only over HTTPS to the intended origin.
 
-Public client routes use POST. Send JSON with `Content-Type: application/json`, except `/api/v1/auth/verify`, which needs no body. Put the credential in `Authorization: Bearer <token>`. Never put a token in a URL, document, chat message, terminal output, or saved example. Keep credentials in the caller's existing secret store or process, outside this skill. Do not create a key unless the user asks for that setup. On a PC, [setup](references/setup.md) explains how to check for a key, how the user saves one, and how to use it.
+Public client routes use POST. Send JSON with `Content-Type: application/json`, except `/api/v1/auth/verify`, which needs no body. Put the credential in `Authorization: Bearer <token>`. Never put a token in a URL, document, chat message, terminal output, or saved example. Keep credentials in the caller's existing secret store or process, outside this skill. Do not create a key unless the user asks for that setup. On a PC, [setup](setup.md) explains how to check for a key, how the user saves one, and how to use it.
 
 ## Caller kinds
 
-These short names are used in the [route index](references/route-index.md).
+These short names are used in the [route index](route-index.md).
 
 | Name | Credential | Authority |
 | --- | --- | --- |

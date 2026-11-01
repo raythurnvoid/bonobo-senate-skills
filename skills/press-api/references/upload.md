@@ -13,7 +13,7 @@ Each saved or uploaded file costs at least 1 cent. A batch with no credits left 
 
 ## 1. Load the key
 
-The `login` command in [setup](references/setup.md) saves the key and API origin in `~/.config/bonobo-senate/credentials.json` as `{ "origin": "...", "key": "..." }`. Read them into variables inside the same command that uses them. Never print the key. Each shell call starts fresh, so load them again in every call. If `T3_API_KEY` and `T3_API_ORIGIN` are set, use those instead.
+The `login` command in [setup](setup.md) saves the key and API origin in `~/.config/bonobo-senate/credentials.json` as `{ "origin": "...", "key": "..." }`. Read them into variables inside the same command that uses them. Never print the key. Each shell call starts fresh, so load them again in every call. If `T3_API_KEY` and `T3_API_ORIGIN` are set, use those instead.
 
 ```bash
 ORIGIN=$(jq -r .origin ~/.config/bonobo-senate/credentials.json)
@@ -119,7 +119,7 @@ A PUT answers 200. The file then stays `pending` for a few seconds, until the se
 
 ## 4. Check the result
 
-List the folder. Follow `cursor` until `isDone` is true. Every file should show `status: "ready"`. More detail is in [Files](references/files.md).
+List the folder. Follow `cursor` until `isDone` is true. Every file should show `status: "ready"`. More detail is in [Files](files.md).
 
 ```powershell
 $body = @{ path = "/notes"; cursor = $null; limit = 100 } | ConvertTo-Json

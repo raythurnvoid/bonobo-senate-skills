@@ -13,7 +13,11 @@ import { parseArgs } from "node:util";
 // Messages name the script by its full path, so the user can run them from any folder.
 const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
-const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /.
+// Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
+// The skill test in the Bonobo Senate repo checks that the two match.
+const VERSION = "1.0.0";
+
+const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
 Key:
   login --origin <api origin>     Read the key from stdin (a pipe or a hidden prompt), check it, save it.
@@ -23,7 +27,14 @@ Key:
 Files:
   ls [folder] [--recursive] [--all] [--cursor <c>]
                                   List a folder. --all follows every page.
-  stat <path>...                  Say for each path: found (with its details), missing, or denied.
+  stat <path>... [--expect found|missing|denied]
+                                  Say for each path: found (with its details), missing, or denied.
+                                  Exit 0 when every path has the --expect status (default found), else 1.
+  read <path> [--to <file>]       Write the saved bytes of a file to stdout, or to --to, following every page.
+                                  Then print { path, contentType, revision, size, isLatest }: on stdout with
+                                  --to, on stderr without. In PowerShell, use --to: before 7.4, > breaks bytes.
+  write <path> --from <file | -> [--if-revision <revision>]
+                                  Create a text file or replace its whole text. - reads stdin.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
   rm <path>... [--wait]           Move files and folders to Trash, like rm -r. restore brings them back.
   restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait]
@@ -42,8 +53,8 @@ Files:
                                   Replace the one place in a text file that matches the old text.
   append <path> --from <file | -> [--if-revision <revision>]
                                   Add text at the end of a text file. No newline is added. - reads stdin.
-                                  edit and append read local files as UTF-8 and send every byte unchanged.
-                                  --if-revision takes X-File-Revision from your last read. The change then
+                                  write, edit, and append read local files as UTF-8 and send every byte unchanged.
+                                  --if-revision takes the revision from your last read. The change then
                                   fails if the file changed since. Send it when you may run the command
                                   again: a second run without it can append twice.
 
@@ -250,7 +261,7 @@ async function read_utf8_text(file) {
 	try {
 		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 	} catch {
-		throw new UsageError(`Not valid UTF-8 text: ${file}`);
+		throw new UsageError(`Not valid UTF-8 text: ${file}. Use upload for binary files.`);
 	}
 }
 // #endregion credentials
@@ -411,6 +422,7 @@ async function command_status() {
 	console.log(
 		JSON.stringify(
 			{
+				version: VERSION,
 				source: credentials.source,
 				...(credentials.source === "file" ? { path: CREDENTIALS_PATH } : {}),
 				origin: credentials.origin,
@@ -503,11 +515,16 @@ async function command_ls(args) {
 }
 
 async function command_stat(args) {
-	const { positionals } = parseArgs({ args, allowPositionals: true, options: {} });
+	const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { expect: { type: "string" } } });
+	const expected = values.expect ?? "found";
+	// Use the status words of the output, so a script can copy the word it sees.
+	if (!["found", "missing", "denied"].includes(expected)) {
+		throw new UsageError(`--expect must be found, missing, or denied, not: ${expected}`);
+	}
 	check_workspace_paths(positionals);
 	const items = await stat_paths(load_credentials(), positionals);
 	print_json({ items });
-	return items.every((item) => item.status === "found") ? 0 : 1;
+	return items.every((item) => item.status === expected) ? 0 : 1;
 }
 
 async function command_mkdir(args) {
@@ -798,6 +815,101 @@ async function command_upload(args) {
 	return failed.length > 0 || pending.length > 0 ? 1 : 0;
 }
 
+async function command_read(args) {
+	const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { to: { type: "string" } } });
+	if (positionals.length !== 1) throw new UsageError(`Give one workspace path.\n\n${USAGE}`);
+	check_workspace_paths(positionals);
+	const target = values.to;
+
+	// lstat also sees a link whose target is gone.
+	if (target !== undefined) {
+		const stats = fs.lstatSync(target, { throwIfNoEntry: false });
+		if (stats?.isDirectory() || stats?.isSymbolicLink()) {
+			throw new UsageError(`--to must name a file, not a folder or a link: ${target}`);
+		}
+	}
+	const credentials = load_credentials();
+
+	// With --to, write a new file next to the target and rename it at the end, so a failed read keeps
+	// the old file. "wx" refuses to open a file that is already there, so we only ever delete our own file.
+	const tempPath = target === undefined ? null : `${target}.${crypto.randomUUID().slice(0, 8)}.part`;
+	let tempFd = tempPath === null ? null : fs.openSync(tempPath, "wx");
+
+	// The write callback alone misses an error that comes later, such as a closed pipe (EPIPE after
+	// "| head"). Without a listener, that error event would crash the process with a stack trace.
+	let stdoutError = null;
+	if (tempFd === null) process.stdout.on("error", (error) => (stdoutError ??= error));
+	let wroteStdout = false;
+
+	let facts = null;
+	try {
+		let cursor = null;
+		do {
+			const result = await post_with_retry(credentials, "files/read", { path: positionals[0], cursor });
+			if (!result.ok) throw new ApiError(result);
+
+			const headers = result.fileHeaders;
+			facts ??= {
+				path: positionals[0],
+				contentType: headers["x-file-content-type"],
+				revision: headers["x-file-revision"],
+				size: Number(headers["x-file-size"]),
+				isLatest: headers["x-file-is-latest"] === "true",
+			};
+
+			if (tempFd !== null) {
+				fs.writeFileSync(tempFd, result.bytes);
+			} else if (result.bytes.length > 0) {
+				// Wait until stdout took the page before asking for the next one, so a slow reader
+				// cannot pile up pages in memory.
+				wroteStdout = true;
+				await new Promise((resolve, reject) =>
+					process.stdout.write(result.bytes, (error) => (error ? reject(error) : resolve())),
+				).catch((error) => {
+					stdoutError ??= error;
+				});
+				if (stdoutError) throw new Error(`Cannot write to stdout: ${stdoutError.message}.`);
+			}
+
+			cursor = headers["x-file-next-cursor"] ?? null;
+		} while (cursor !== null);
+
+		if (tempFd !== null) {
+			fs.closeSync(tempFd);
+			tempFd = null;
+			try {
+				fs.renameSync(tempPath, target);
+			} catch (error) {
+				// Windows refuses to replace a file that another program holds open.
+				throw ["EPERM", "EBUSY", "EACCES"].includes(error.code)
+					? new Error(
+							`Cannot replace ${target} (${error.code}). Close the program that holds it open, or pick another --to file.`,
+						)
+					: error;
+			}
+		}
+	} catch (error) {
+		if (tempPath !== null) {
+			if (tempFd !== null) fs.closeSync(tempFd);
+			fs.rmSync(tempPath, { force: true });
+		} else if (wroteStdout && !stdoutError) {
+			// The bytes already sent cannot be taken back.
+			error.message += " The output is incomplete. Discard it and run the command again.";
+		}
+		throw error;
+	}
+
+	if (!facts.isLatest) {
+		process.stderr.write(
+			"Note: someone is typing in this file. The saved text does not have their change yet, and a write with this revision is refused (file_not_latest) until it does.\n",
+		);
+	}
+	// stdout holds the bytes when there is no --to. Then the facts go to stderr, like the headers of call.
+	if (target !== undefined) print_json(facts);
+	else process.stderr.write(`${JSON.stringify(facts)}\n`);
+	return 0;
+}
+
 async function command_change(kind, args) {
 	const isEdit = kind === "edit";
 	const { values, positionals } = parseArgs({
@@ -834,8 +946,9 @@ async function command_change(kind, args) {
 	});
 	if (!result.ok) {
 		const error = new ApiError(result);
-		// These two messages already say to read the file again.
-		if (result.status === 409 && !["file_changed", "file_not_latest"].includes(result.json?.errorCode)) {
+		// Only these refusals pass after a new read. file_changed and file_not_latest already say what to
+		// do, and running again does not help for others, such as file_needs_repair or Read-only.
+		if (result.status === 409 && ["file_busy", "text_not_found", "text_not_unique"].includes(result.json?.errorCode)) {
 			error.message += " Read the file and run the command again.";
 		}
 		throw error;
@@ -865,6 +978,8 @@ const commands = {
 	cp: (args) => command_transfer("copy", args),
 	job: command_job,
 	upload: command_upload,
+	read: command_read,
+	write: (args) => command_change("write", args),
 	edit: (args) => command_change("edit", args),
 	append: (args) => command_change("append", args),
 	call: command_call,

@@ -1,6 +1,6 @@
 # Plugin document store
 
-Use the [route index](references/route-index.md) for scopes and callers. These routes store plugin documents, not Files. A file grant does not grant store access. Reads need current workspace content-read permission; writes need content-write permission and accepted plugin consent.
+Use the [route index](route-index.md) for scopes and callers. These routes store plugin documents, not Files. A file grant does not grant store access. Reads need current workspace content-read permission; writes need content-write permission and accepted plugin consent.
 
 A personal key must include `installationId` from its own workspace. Plugin tokens must omit it: their installation comes from the token. Missing it for a key gives 400 `installationId is required for an API key`; sending it with a plugin token gives 400 `installationId is not allowed for this token`. Service-bound keys and short grants cannot use these store routes.
 

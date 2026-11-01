@@ -8,6 +8,8 @@ Agent skills for Bonobo Senate.
 
 The skills are plain folders with a `SKILL.md` file. Any agent that reads Agent Skills can use them.
 
+Each skill has a version in `metadata.version` of its `SKILL.md`. The `press-api` CLI prints the same version in `help` and `status`, so you can tell whether a copy is current. Raise the version with every change to the skill.
+
 ## Install
 
 Pick the way that fits your agent. None of them needs an extra package. Use one way per agent: two ways can put two copies of the skill in the same agent, and the `skills` CLI replaces an existing `~/.claude/skills/press-api` link.

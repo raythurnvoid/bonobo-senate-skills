@@ -1,6 +1,6 @@
 # Plugin runtime contracts
 
-These routes are for plugin callers listed in the [route index](references/route-index.md). A personal API key cannot replace a Frame, Run, Service grant, or registered service secret. Scope, accepted capabilities, current membership, installation/account binding, target access, and file policy all still apply.
+These routes are for plugin callers listed in the [route index](route-index.md). A personal API key cannot replace a Frame, Run, Service grant, or registered service secret. Scope, accepted capabilities, current membership, installation/account binding, target access, and file policy all still apply.
 
 ## Sealed service grants
 
@@ -20,7 +20,7 @@ Save `requestId` before sending a lifecycle request. If its reply is lost, recov
 
 ## Plugin folders and conditional writers
 
-Ordinary file operations are described in [Files](references/files.md). Plugin file writes also require the correct labels and accepted own-write/own-access capabilities. Inside a plugin's allowed roots it acts as the member; its own output folder has the installation account's writer rules. A label or selected writer does not grant file access. Manual sharing can detach external reader control.
+Ordinary file operations are described in [Files](files.md). Plugin file writes also require the correct labels and accepted own-write/own-access capabilities. Inside a plugin's allowed roots it acts as the member; its own output folder has the installation account's writer rules. A label or selected writer does not grant file access. Manual sharing can detach external reader control.
 
 Invoke Runs and registered sealed writers use these shared routes:
 
