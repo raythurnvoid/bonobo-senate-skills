@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -263,6 +263,10 @@ async function read_stdin() {
  * Read a local file, or stdin for "-", as strict UTF-8. Keep every byte, including a leading BOM.
  */
 async function read_utf8_text(file) {
+	// A local mistake is a usage error (exit 2). Exit 1 would say that the API refused something.
+	if (file !== "-" && !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) {
+		throw new UsageError(`Local file not found: ${file}`);
+	}
 	const bytes = file === "-" ? await read_stdin_bytes() : fs.readFileSync(file);
 	try {
 		return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
@@ -887,6 +891,10 @@ async function command_read(args) {
 		const stats = fs.lstatSync(target, { throwIfNoEntry: false });
 		if (stats?.isDirectory() || stats?.isSymbolicLink()) {
 			throw new UsageError(`--to must name a file, not a folder or a link: ${target}`);
+		}
+		const folder = path.dirname(path.resolve(target));
+		if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) {
+			throw new UsageError(`Local folder not found: ${folder}`);
 		}
 	}
 	const credentials = load_credentials();
