@@ -6,7 +6,7 @@ The helper is [api.mjs](scripts/api.mjs). It needs Node 22 or newer and has no d
 
 Run `help` to list every command. `--help` after any command prints the same list.
 
-Exit codes: 0 ok, 1 the API refused something or an upload failed, 2 usage error, 3 cannot reach the API, 4 no API key is set up.
+Exit codes: 0 ok, 1 the API refused something or an upload failed, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.
 
 ## 1. Check for a key
 
@@ -111,7 +111,7 @@ some-command | node <skill folder>/scripts/api.mjs append /Notes/log.md --from -
 - The local files are read as UTF-8 and sent byte for byte, with no BOM removed and no newline added. Put the exact text in a file, because shells change quotes, spaces, and line endings in arguments. A file that is not valid UTF-8 is a usage error (exit 2).
 - `--if-revision` takes the `X-File-Revision` of your last read (`call files/read` prints it on stderr). The change is then refused if the file changed since.
 - Success prints `{ path, nodeId, contentType, revision, size, contentChanged }`. When `contentChanged` is true, a note on stderr says the saved text is not exactly your change: read the file to check.
-- The command never sends the change twice by itself; only a 429 waits and tries again. On a 409, such as `text_not_found` or `file_changed`, it says to read the file and run the command again. When the API cannot be reached (exit 3), the change may be saved anyway: read the file before you run the command again, or an append can happen twice.
+- The command never sends the change twice by itself; only a 429 waits and tries again. On a 409, such as `text_not_found` or `file_changed`, the message says to read the file and run the command again. When the API cannot be reached or its answer is lost (exit 3), the change may be saved anyway: read the file before you run the command again, or an append can happen twice.
 - The key needs `files:read` and `files:write`.
 
 ## 8. Log out

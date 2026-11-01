@@ -17,7 +17,7 @@ The helper CLI is [api.mjs](scripts/api.mjs). Run it by its full path: `node <th
 3. `upload <local folder or file>... --to /<folder> --dry-run`, then the same without `--dry-run`. Add `--wait` to wait until the files are ready, and `--skip-existing` to resume a stopped upload. Names must already be clean (lowercase, no spaces): see [upload](references/upload.md) step 2.
 4. `call <route> <json>` sends any route from the [route index](references/route-index.md).
 
-Exit codes: 0 ok, 1 the API refused something (the JSON says what), 2 usage error, 3 cannot reach the API, 4 no API key. Read [setup](references/setup.md) for every command's details and the Windows notes.
+Exit codes: 0 ok, 1 the API refused something (the JSON says what), 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key. Read [setup](references/setup.md) for every command's details and the Windows notes.
 
 ## Guides
 

@@ -56,7 +56,7 @@ Saved editable text needs `files:read` or `files:download` for keys and short gr
 
 The CLI `call files/read` returns one page only. Its raw bytes go to stdout or `--out`; the file headers go to stderr as JSON. Follow the next cursor with another call. A preview client can stop after its first page and keep only the bytes it needs.
 
-TODO: consider streaming, an optional `pageBytes` hint, and a saved-version freshness signal when callers need them.
+TODO: consider streaming and an optional `pageBytes` hint when callers need them.
 
 ## Text writes and empty files
 
@@ -77,7 +77,7 @@ An omitted type uses the new name's type hint; an existing editable file keeps i
 POST `/api/v1/files/edit` with `{ path, oldText, newText, expectedRevision?, force? }` replaces the one place where `oldText` matches. POST `/api/v1/files/append` with `{ path, content, expectedRevision?, force? }` adds `content` at the end; it adds no newline. Both need an API key with `files:read` and `files:write`, and read and write access to the file. Success has the same fields as a `write` answer. Every byte outside the change stays as it was.
 
 - The file must be an existing editable text file: a missing file is 404, a locked one 403, a folder or a stored file 400.
-- `oldText` must not be empty. The match is literal, with no trimming or patterns. No match is 409 `text_not_found`. More than one match, also overlapping ones, is 409 `text_not_unique`: add text around it so it matches once.
+- `oldText` must not be empty. The match is literal, with no trimming or patterns. No match is 409 `text_not_found`. More than one match, also overlapping ones, is 409 `text_not_unique`: add text around it so it matches once. A refusal a save would give (a revoked key, no write access, Read-only, needs repair, or a stale `expectedRevision`) comes first, also before a 400 for a result over the size limit.
 - `oldText` equal to `newText`, or an empty `content`, saves nothing and answers `unchanged: true`. An edit may leave the file empty.
 - Text with a lone surrogate (not valid Unicode) is 400. The result follows the LF and BOM rule of `write`.
 - When someone is typing in the file, the change starts from their text in the editor, so the saved file has the editor's format. `contentChanged: true` says so; read the file to check.

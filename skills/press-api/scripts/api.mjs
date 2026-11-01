@@ -3,7 +3,7 @@
 // Small Bonobo Senate public API client for agents and people on a PC. Node 22 or newer, no dependencies.
 // Read references/setup.md in this skill folder before using it.
 //
-// Exit codes: 0 ok, 1 the API or an upload failed, 2 usage error, 3 cannot reach the API, 4 no API key is set up.
+// Exit codes: 0 ok, 1 the API or an upload failed, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -52,7 +52,7 @@ Any route:
                                   POST one route, for example: call files/list '{"path":"/"}'
                                   Use - to read the JSON body from stdin. --out saves a raw byte answer.
 
-Exit codes: 0 ok, 1 the API or an upload failed, 2 usage error, 3 cannot reach the API, 4 no API key is set up.`;
+Exit codes: 0 ok, 1 the API or an upload failed, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.`;
 
 // Keep the key in the home folder, not in this skill folder and not in AppData.
 // A reinstall of the skill replaces its folder, which would delete the key.
@@ -131,6 +131,7 @@ class NoKeyError extends Error {}
 
 /**
  * The request did not reach the API: no network, a sandbox allowlist, or a wrong origin. The key may be fine.
+ * It also means the answer was lost after it started to arrive. Then the request may have run.
  */
 class NetworkError extends Error {}
 
@@ -273,13 +274,22 @@ async function post(credentials, route, body) {
 	});
 
 	const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
-	const bytes = Buffer.from(await response.arrayBuffer());
+	// The answer can break after its headers arrived. The request may have run, so report it like a
+	// lost connection.
+	let bytes;
+	let json;
+	try {
+		bytes = Buffer.from(await response.arrayBuffer());
+		json = isJson ? JSON.parse(bytes.toString("utf8")) : null;
+	} catch (error) {
+		throw new NetworkError(`Lost the answer from ${credentials.origin}: ${error.message}.`);
+	}
 	return {
 		status: response.status,
 		ok: response.ok,
 		isJson,
 		bytes,
-		json: isJson ? JSON.parse(bytes.toString("utf8")) : null,
+		json,
 		// files/read describes the saved file here. A next cursor continues the read.
 		fileHeaders: Object.fromEntries([...response.headers].filter(([name]) => name.startsWith("x-file-"))),
 	};
@@ -824,13 +834,16 @@ async function command_change(kind, args) {
 	});
 	if (!result.ok) {
 		const error = new ApiError(result);
-		if (result.status === 409) error.message += " Read the file and run the command again.";
+		// These two messages already say to read the file again.
+		if (result.status === 409 && !["file_changed", "file_not_latest"].includes(result.json?.errorCode)) {
+			error.message += " Read the file and run the command again.";
+		}
 		throw error;
 	}
 
 	if (result.json.contentChanged) {
 		process.stderr.write(
-			"Note: the saved text is not exactly your change. Someone's unsaved typing or the editor's format is in it. Read the file to check.\n",
+			"Note: the saved text is not exactly your change. Line endings became LF, a leading BOM was removed, or it holds someone's unsaved typing in the editor's format. Read the file to check.\n",
 		);
 	}
 	print_json(result.json);
