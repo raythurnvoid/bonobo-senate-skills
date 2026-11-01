@@ -242,8 +242,9 @@ async function post(credentials, route, body) {
 		body: body === undefined ? undefined : JSON.stringify(body),
 		redirect: "error",
 	}).catch((error) => {
+		// A failed connect can have an empty cause message and only a code such as ETIMEDOUT.
 		throw new NetworkError(
-			`Cannot reach ${credentials.origin}: ${error.cause?.message ?? error.message}. Check the network and any sandbox network allowlist. The key may be fine.`,
+			`Cannot reach ${credentials.origin}: ${error.cause?.message || error.cause?.code || error.message}. Check the network and any sandbox network allowlist. The key may be fine.`,
 		);
 	});
 
@@ -725,7 +726,7 @@ async function command_upload(args) {
 							ok: false,
 							status: 0,
 							// The bytes go to a storage host, not the API origin. A sandbox allowlist needs this host too.
-							statusText: `cannot reach ${new URL(target.uploadUrl).host}: ${error.cause?.message ?? error.message}`,
+							statusText: `cannot reach ${new URL(target.uploadUrl).host}: ${error.cause?.message || error.cause?.code || error.message}`,
 						}));
 					let response = await put();
 					// Try once more after a network error or a storage hiccup.
