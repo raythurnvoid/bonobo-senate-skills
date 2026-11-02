@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.1.5";
+const VERSION = "1.2.0";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -40,6 +40,9 @@ Files:
   trash [--area <node id>] [--all] [--cursor <c>]
                                   List what is in Trash, newest delete first. --area lists inside one
                                   restricted folder. --all follows every page.
+  trash areas [--all] [--cursor <c>]
+                                  List the Trash areas you can open: the workspace (areaNodeId null)
+                                  first, then each restricted folder by path. Pass one to trash --area.
   restore <path>... [--on-conflict keep_both|skip] [--request-id <id>] [--wait] [--dry-run]
   restore --node <node id>:<archive operation id>... [same options]
                                   Bring back each item and the items inside it that were moved to Trash with it.
@@ -571,11 +574,24 @@ async function command_trash(args) {
 		allowPositionals: true,
 		options: { area: { type: "string" }, all: { type: "boolean" }, cursor: { type: "string" } },
 	});
-	if (positionals.length > 0) throw new UsageError(`trash takes no paths. Use --area <node id>.\n\n${USAGE}`);
+	const isAreas = positionals.length === 1 && positionals[0] === "areas";
+	if (positionals.length > 0 && !isAreas)
+		throw new UsageError(`trash takes no paths. Use --area <node id>, or trash areas.\n\n${USAGE}`);
+	if (isAreas && values.area !== undefined) throw new UsageError(`trash areas takes no --area.\n\n${USAGE}`);
 
 	const credentials = load_credentials();
 	const items = [];
 	let cursor = values.cursor ?? null;
+	if (isAreas) {
+		while (true) {
+			const page = await post_json(credentials, "files/trash/areas", { cursor });
+			items.push(...page.areas);
+			cursor = page.cursor;
+			if (!values.all || cursor === null) break;
+		}
+		print_json({ areas: items, cursor, isDone: cursor === null });
+		return;
+	}
 	while (true) {
 		const page = await post_json(credentials, "files/trash/list", { areaNodeId: values.area ?? null, cursor });
 		items.push(...page.items);

@@ -140,12 +140,21 @@ List what is in Trash, newest delete first.
 
 - Body: `{ areaNodeId?, cursor?, limit? }`. `limit` is 1 to 100 (default 100). While `cursor` in the answer is not `null`, call again with it.
 - It needs a personal key with `files:list`; a key bound to a service account gets 403, and so does a guest.
-- An area is the open part of the workspace (`areaNodeId` missing or `null`) or one restricted folder (its node ID). A restricted folder shows in the area above it, and what is inside it shows only in its own area. A restricted folder you cannot open shows as a locked item; its area answers 403. A missing area answers 404, and a node that is not a restricted folder answers 400.
+- An area is the open part of the workspace (`areaNodeId` missing or `null`) or one restricted folder (its node ID). `files/trash/areas` lists the areas you can open. A restricted folder shows in the area above it, and what is inside it shows only in its own area. A restricted folder you cannot open shows as a locked item; its area answers 403. A missing area answers 404, and a node that is not a restricted folder answers 400.
 - Success: `{ items: [{ path, name, kind, nodeId, contentType, updatedAt, size, locked, archiveOperationId, operationAt, changedBy, top }], cursor, isDone }`.
 - It lists every deleted item, also the ones inside a deleted folder. `top: true` marks what the app Trash shows: the items whose folder was not deleted with them.
 - `archiveOperationId` names one delete. Restoring a folder brings back only its descendants with the same id. Other items from that delete stay in Trash. `operationAt` is when that delete happened, or `null` for old deletes.
 - `changedBy` is the user ID of who last changed the item, usually who deleted it. It is `null` for a locked item.
 - A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor. Other errors answer `{ message }` only.
+
+## Trash areas (`files/trash/areas`)
+
+List the Trash areas you can open, to pick an `areaNodeId` for `files/trash/list`.
+
+- Body: `{ cursor?, limit? }`. `limit` is 1 to 100 (default 100). While `cursor` in the answer is not `null`, call again with it.
+- It needs a personal key with `files:list`; a key bound to a service account gets 403, and so does a guest.
+- Success: `{ areas: [{ areaNodeId, path }], cursor, isDone }`. The first page starts with the open part of the workspace (`areaNodeId: null`, `path: "/"`). Then come the restricted folders you can open, by path. A restricted folder in Trash is not an area.
+- A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor.
 
 ## Restore (`files/restore`)
 
@@ -161,7 +170,7 @@ Bring back deleted items, like Restore in the app Trash.
 - Success: `{ jobIds, isDone, refused }`, where each refused item is `{ path, message }` or, for `nodes`, `{ nodeId, path, message }`. There is one job for each `delete` call the paths or nodes came from. Read each one with `jobs/get` (it needs `files:list`), also when `isDone` is `true`, because only the job names the items that came back with a new name or stayed in the Trash.
 - `refused` names paths with no deleted item (`Not found`), paths of items that are not deleted (`Not in the Trash`), locked paths (`Permission denied`), paths deleted more than once (find the one you want in `files/trash/list` and restore it by `nodes`), and paths whose job could not start, with the reason.
 - A refused node is `{ nodeId, path, message }`. `Not found` and `Permission denied` have `path: null`. "This Trash item changed. List the Trash and pick it again." means the item was restored or deleted again since you listed it.
-- A job that started but stopped partway (`Stopped partway: …`) keeps what it restored, and it is in `jobIds` too: read it to see what is still in the Trash. The other paths are still restored.
+- A job that started but stopped partway (`Stopped partway: …`) keeps what it restored, and it is in `jobIds` too: read it to see what is still in the Trash. It can still be `stopping` for a short while, so `isDone` can be `false`; wait until `jobs/get` shows it finished. The other paths are still restored.
 - Send the same `requestId` and body again after a lost answer: you get the same `jobIds` back for 7 days, and nothing is restored twice, even if the item was deleted again since. The same `requestId` with another body is 409.
 - 429 means too many changes in a row; wait (`retryAfterMs` when it is there) and send the same request again.
 
