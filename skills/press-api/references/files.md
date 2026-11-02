@@ -143,7 +143,7 @@ List what is in Trash, newest delete first.
 - An area is the open part of the workspace (`areaNodeId` missing or `null`) or one restricted folder (its node ID). `files/trash/areas` lists the areas you can open. A restricted folder shows in the area above it, and what is inside it shows only in its own area. A restricted folder you cannot open shows as a locked item; its area answers 403. A missing area answers 404, and a node that is not a restricted folder answers 400.
 - Success: `{ items: [{ path, name, kind, nodeId, contentType, updatedAt, size, locked, archiveOperationId, operationAt, changedBy, top }], cursor, isDone }`.
 - It lists every deleted item, also the ones inside a deleted folder. `top: true` marks what the app Trash shows: the items whose folder was not deleted with them.
-- `archiveOperationId` names one delete. Restoring a folder brings back only its descendants with the same id. Other items from that delete stay in Trash. `operationAt` is when that delete happened, or `null` for old deletes.
+- `archiveOperationId` names one delete. Restoring a folder brings back only its descendants with the same id. Other items from that delete stay in Trash. `operationAt` is when that delete happened.
 - `changedBy` is the user ID of who last changed the item, usually who deleted it. It is `null` for a locked item.
 - A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor. Other errors answer `{ message }` only.
 
