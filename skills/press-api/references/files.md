@@ -138,13 +138,15 @@ Move files and folders to Trash, like `rm -r` with several paths.
 
 List what is in Trash, newest delete first.
 
-- Body: `{ areaNodeId?, cursor?, limit? }`. `limit` is 1 to 100 (default 100). While `cursor` in the answer is not `null`, call again with it.
-- It needs a personal key with `files:list`; a key bound to a service account gets 403, and so does a guest.
+- Body: `{ areaNodeId?, folderNodeId?, cursor?, limit? }`, with at most one of `areaNodeId` and `folderNodeId`. `limit` is 1 to 100 (default 100). While `cursor` in the answer is not `null`, call again with it.
+- It needs `files:list`. A personal key works, and so does a key bound to a service account: that key acts as the account and sees only what the account may open. A guest gets 403.
 - An area is the open part of the workspace (`areaNodeId` missing or `null`) or one restricted folder (its node ID). `files/trash/areas` lists the areas you can open. A restricted folder shows in the area above it, and what is inside it shows only in its own area. A restricted folder you cannot open shows as a locked item; its area answers 403. A missing area answers 404, and a node that is not a restricted folder answers 400.
 - Success: `{ items: [{ path, name, kind, nodeId, contentType, updatedAt, size, locked, archiveOperationId, operationAt, changedBy, top }], cursor, isDone }`.
 - It lists every deleted item, also the ones inside a deleted folder. `top: true` marks what the app Trash shows: the items whose folder was not deleted with them.
 - `archiveOperationId` names one delete. Restoring a folder brings back only its descendants with the same id. Other items from that delete stay in Trash. `operationAt` is when that delete happened.
 - `changedBy` is the user ID of who last changed the item, usually who deleted it. It is `null` for a locked item.
+- `folderNodeId` lists only the deleted items directly inside one folder. Use it when you can open a folder but not its area, for example when an account key has a grant on one folder. The folder may itself be in Trash, so you can walk into a deleted folder. A folder you cannot open answers 403, a missing one 404, and a file 400. Here `top: true` means the item was deleted by another delete than the folder.
+- An account key with only folder grants gets 403 for the open area. Use `files/trash/areas` or `folderNodeId` instead.
 - A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor. Other errors answer `{ message }` only.
 
 ## Trash areas (`files/trash/areas`)
@@ -152,8 +154,8 @@ List what is in Trash, newest delete first.
 List the Trash areas you can open, to pick an `areaNodeId` for `files/trash/list`.
 
 - Body: `{ cursor?, limit? }`. `limit` is 1 to 100 (default 100). While `cursor` in the answer is not `null`, call again with it.
-- It needs a personal key with `files:list`; a key bound to a service account gets 403, and so does a guest.
-- Success: `{ areas: [{ areaNodeId, path }], cursor, isDone }`. The first page starts with the open part of the workspace (`areaNodeId: null`, `path: "/"`). Then come the restricted folders you can open, by path. A restricted folder in Trash is not an area.
+- It needs `files:list`. A personal key works, and so does a key bound to a service account: its areas are the restricted folders shared with the account or its role. A guest gets 403.
+- Success: `{ areas: [{ areaNodeId, path }], cursor, isDone }`. The first page starts with the open part of the workspace (`areaNodeId: null`, `path: "/"`) when the key can open the workspace root. Then come the restricted folders you can open, by path. A restricted folder in Trash is not an area.
 - A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor.
 
 ## Restore (`files/restore`)
@@ -163,7 +165,7 @@ Bring back deleted items, like Restore in the app Trash.
 - Body: `{ paths | nodes, onConflict?, requestId?, dryRun? }`. `paths` is 1 to 100 absolute paths of deleted items, with no repeats, not `/`. Split a longer list into several calls. `requestId` works like in `move`; it is required unless `dryRun` is `true`.
 - `nodes` picks items from `files/trash/list` instead of paths: `[{ nodeId, archiveOperationId }]`, 1 to 100, with no repeated `nodeId`. Use it when several deleted items have one path. Send `paths` or `nodes`, not both.
 - `dryRun: true` says what the restore would do and changes nothing: no file comes back and no job is saved. Send no `requestId`. Success: `{ dryRun: true, complete, refused, jobs }`, where each job has the `jobs/get` fields without `jobId` and `refusedCursor`, plus `hasMoreItems`. `hasMoreItems: true` means the job would rename or skip more items than its `renamed` and `refused` lists show. `complete: false` means a big delete did not finish in the preview, so its later results are not known.
-- It needs a personal key; a key bound to a service account gets 403.
+- A personal key works, and so does a key bound to a service account: that key acts as the account in every step, so it brings back only what the account may change.
 - Each path or node brings back that item and only its descendants with the same `archiveOperationId`. A file comes back alone. Other items from that delete stay in Trash. A descendant from another delete also stays in Trash. Each item comes back at the path it had when it moved to Trash, like `mkdir -p`. When a folder on that path is gone, renamed, or still in Trash, the restore creates a new folder there. A renamed folder keeps its new name, and an old folder in Trash stays there. A file where a folder should be refuses the restore with `file_in_the_way`.
 - Selecting a folder and an item inside it restores each item once. There is still one job per delete id. A job refusal names every original selection from that delete, including a covered child. It never adds unselected items. A retry keeps the original selections and answer.
 - `onConflict` says what happens when an item with the same name is already there: `keep_both` (the default) restores it with a new name such as `notes-2.md`, and `skip` leaves it deleted. `jobs/get` names each item that got a new name or stayed deleted. A job stops with a message when Keep both finds no free name.
@@ -242,7 +244,7 @@ Turn the Public flag of a file on or off. A public image or video file can show 
 - Both On and Off need edit permission on the file, and On also needs read. A scope alone is insufficient.
 - A move into another restricted area, a restrict, or an unrestrict turns the flag off. A copy starts off.
 - Repeating the current value changes nothing.
-- Errors: 400: bad body, or a folder. 401: the key or its membership is unavailable. 404: missing, in Trash, or not editable by the key's user, or not readable for On. 409 (turning on only): the item is being moved, or an access change of the item or a folder above is still running; retry later. 429: too many Sharing changes; wait `retryAfterMs`. 403: other refusals, such as a plugin-bound folder.
+- Errors: 400: bad body, or a folder. 401: the key or its membership is unavailable. 404: missing, in Trash, or not editable by the key's user, or not readable for On. 409 (turning on only): the item is being moved, or an access change of the item or a folder above is still running; retry later. 429: too many Sharing changes; wait `retryAfterMs`. 403: other refusals.
 - There is no public API to turn "Anyone with the link" share links on or off or retrieve their link tokens. That is separate from `public/set`.
 
 ## Names and limits

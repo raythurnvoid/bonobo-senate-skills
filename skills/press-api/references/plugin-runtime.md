@@ -20,17 +20,17 @@ Save `requestId` before sending a lifecycle request. If its reply is lost, recov
 
 ## Plugin folders and conditional writers
 
-Ordinary file operations are described in [Files](files.md). Plugin file writes also require the correct labels and accepted own-write/own-access capabilities. Inside a plugin's allowed roots it acts as the member; its own output folder has the installation account's writer rules. A label or selected writer does not grant file access. Manual sharing can detach external reader control.
+Ordinary file operations are described in [Files](files.md). Plugin file writes also require the correct labels and the accepted own-write capability. Every plugin file call needs the person and the installation's service account to pass the normal file check. A label or a writer does not grant file access. A folder a plugin creates is a regular folder with its parent's access; the plugin cannot choose its readers. The old `workspace.files.own-access` capability is removed, and a new manifest that asks for it is refused.
 
 Invoke Runs and registered sealed writers use these shared routes:
 
 | Route | Body |
 | --- | --- |
-| `/api/v1/files/plugin-folders/ensure` | `{ path, access?, writer?: { resourceKey, rootNodeId } }` |
+| `/api/v1/files/plugin-folders/ensure` | `{ path, access?: { readOnly? }, writer?: { resourceKey, rootNodeId } }` |
 | `/api/v1/files/plugin-archive` | `{ path, writer?: { writerId, operationId, writerGeneration, sequence, nodeId, expectedContentRevision? } }` |
-| `/api/v1/files/plugin-access/set` | `{ path, access, writer?: { writerId, operationId, writerGeneration, expectedReaderRevision } }` |
+| `/api/v1/files/plugin-access/set` | `{ path, access: { readOnly }, writer?: { writerId, operationId, writerGeneration } }` |
 
-`access` accepts `readOnly?`, `readScopeId?`, and `readers?: [{ userId, membershipLifetime }]`. Use at most 50 different readers. A reader list and a store read scope cannot be combined. New folder access is applied at creation; retries never silently take over an existing folder or restore removed grants. A null writer root creates a new unused sealed root; a supplied root must match the saved writer. Save returned writer/folder IDs.
+`plugin-access/set` only sets or clears Read-only. It needs `workspace.files.manage-read-only` and Can edit, and it never changes sharing. Ensure applies `readOnly` only when it creates the folder; retries never silently take over an existing folder or restore removed grants. A null writer root creates a new unused sealed root; a supplied root must match the saved writer. Save returned writer/folder IDs.
 
 Registered writer mode needs the service secret too. Inspect before a conditional write:
 
@@ -38,15 +38,12 @@ Registered writer mode needs the service secret too. Inspect before a conditiona
 | --- | --- |
 | `/api/v1/files/plugin-writers/inspect` | `{ writerId, path, maxBytes }` |
 | `/api/v1/files/plugin-writers/advance` | `{ writerId, operationId, writerGeneration, nextGeneration }` |
-| `/api/v1/files/plugin-access/undo` | `{ writerId, operationId, writerGeneration, receiptId? , originalReaderOperationId? }` |
 
-Inspect returns `nodeId`, bounded `content`, `contentType`, `contentRevision`, `expectedParentNodeId`, `writerGeneration`, `readerRevision`, and `detached`. A changed or too-large read refuses rather than returning partial editable text.
+Inspect returns `nodeId`, bounded `content`, `contentType`, `contentRevision`, `expectedParentNodeId`, and `writerGeneration`. A changed or too-large read refuses rather than returning partial editable text.
 
-For `/api/v1/files/write`, supply normal text fields, required `expectedParentNodeId`, and `writer: { writerId, operationId, writerGeneration, sequence, expectedNodeId, expectedContentRevision, expectedReaderRevision, contentHash }`. `contentHash` is the SHA-256 hex of normalized content: drop one leading BOM and change CRLF or lone CR to LF before hashing. Preserve inspected revisions and exact target IDs. Writer mode derives create/replace from the expected target, and refuses conflicting overwrite or `skipIfUnchanged: true`. Normalization and create options are part of the replay proof; keep them unchanged on retry.
+For `/api/v1/files/write`, supply normal text fields, required `expectedParentNodeId`, and `writer: { writerId, operationId, writerGeneration, sequence, expectedNodeId, expectedContentRevision, contentHash }`. Do not send `expectedReaderRevision`; the host ignores `null` there only for a short rollout and then refuses the field. `contentHash` is the SHA-256 hex of normalized content: drop one leading BOM and change CRLF or lone CR to LF before hashing. Preserve inspected revisions and exact target IDs. Writer mode derives create/replace from the expected target, and refuses conflicting overwrite or `skipIfUnchanged: true`. Normalization and create options are part of the replay proof; keep them unchanged on retry.
 
-Save operation IDs before calls and save receipts after success. Exact retries return the committed receipt. A changed replay, old sequence, old generation, changed content, or changed reader revision can return 409. Advance moves exactly one generation. `plugin-archive` pins one exact node, so a stale call cannot move a replacement at the same path to Trash. An ordinary sealed call without writer conditions moves one matching file to Trash; an invoke call may cover up to 256 nodes.
-
-Undo takes exactly one of `receiptId` or `originalReaderOperationId`; its own operation ID must differ from the original. It reverses only the recorded reader change, not arbitrary sharing. Keep the original bearer until the external change finishes. Recorded proof can allow this narrow undo after bearer expiry, rotation, or actor access loss, while current installation/account/service/policy checks still apply. Lost responses can be canceled by original operation ID. A detached binding returns `restored: false` without a sharing change. Newer reader/writer state conflicts. Replace saved proof only after 401 `code: "reader_proof_mismatch"`, not after a network error or another refusal.
+Save operation IDs before calls and save receipts after success. Exact retries return the committed receipt. A changed replay, old sequence, old generation, or changed content can return 409. Advance moves exactly one generation. `plugin-archive` pins one exact node, so a stale call cannot move a replacement at the same path to Trash. An ordinary sealed call without writer conditions moves one matching file to Trash; an invoke call may cover up to 256 nodes.
 
 ## Service uploads
 

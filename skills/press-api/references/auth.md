@@ -23,7 +23,7 @@ Files scopes describe the operation: `files:list`, `files:read`, `files:write`, 
 
 Personal keys may also have `files:publish`, `plugin_data:read`, `plugin_data:write`, and `ai_chat:read`. These start unchecked. `files:publish` turns the public flag of an image or video file on or off. `ai_chat:read` reads only the key user's own AI conversations in that workspace, including when that user is a guest. No service key, plugin token, or short grant receives either scope. Existing keys do not gain new scopes automatically.
 
-Plugin file calls use the actor inside the installation's allowed folders. Plugin-owned output folders have their own account and writer rules. A token's scopes alone never give access outside those bounds. Store scopes and accepted plugin capabilities also remain separate from Files permissions.
+A plugin file call needs two normal checks: the person may do it, and the installation's service account may do it. To let a plugin use a folder, share the folder with its service account. Plugins have no other file access: a folder a plugin creates is a regular folder with its parent's access. A token's scopes alone never give access outside those bounds. Store scopes and accepted plugin capabilities also remain separate from Files permissions.
 
 POST `/api/v1/auth/verify` with a personal or service key. It returns `{ organizationId, workspaceId, scopes, serviceAccountId, sponsorUserId }`. The scope list reflects current usable scopes. It does not prove access to a specific file. An empty scope list is a valid result. Rotation revokes the old key; use the new credential and restart old paged reads.
 
