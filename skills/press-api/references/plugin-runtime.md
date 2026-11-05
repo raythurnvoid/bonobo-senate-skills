@@ -79,6 +79,8 @@ Keep both keys stable. A changed create replay is 409. A path must be canonical 
 
 PUT the full file using the returned URL and required headers, without the API bearer. Remint starts a fresh attempt; it is not byte-range resume. Finalize is safe to poll through normal rate limits. A current lock does not cancel an already accepted upload. A moved-out target, released target, closed destination, or changed live access can still refuse the service. Never treat an old URL or a same-path replacement as the same target.
 
+New targets keep their original service account. Before text conversion adds file references, that account must still be live and bound to the installation. If it was revoked or replaced, the upload stays a stored file with its original bytes.
+
 `delete` cancels pending placeholders or moves committed output to Trash. `archive-destination` moves up to 256 nodes in the bound destination to Trash. Both keep current access and policy checks. Neither refunds storage or billing. Save each result; a failed later item does not undo earlier accepted uploads.
 
 ## Identity and member access
