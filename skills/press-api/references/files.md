@@ -147,6 +147,7 @@ List what is in Trash, newest delete first.
 - `changedBy` is the user ID of who last changed the item, usually who deleted it. It is `null` for a locked item.
 - `folderNodeId` lists only the deleted items directly inside one folder. Use it when you can open a folder but not its area, for example when an account key has a grant on one folder. The folder may itself be in Trash, so you can walk into a deleted folder. A folder you cannot open answers 403, a missing one 404, and a file 400. Here `top: true` means the item was deleted by another delete than the folder.
 - An account key with only folder grants gets 403 for the open area. Use `files/trash/areas` or `folderNodeId` instead.
+- Plugin frames and runs also work with `workspace.files.read` and applied personal file consent. They get 403 for the open area. Use a selected folder, even one already in Trash. A file-only choice adds no parent access or area. Guests and scheduled runs are refused; scheduled runs get `Scheduled plugin runs cannot use Trash yet.`. Old-model plugin tokens and service grants are refused. Plugins see `changedBy` too.
 - A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor. Other errors answer `{ message }` only.
 
 ## Trash areas (`files/trash/areas`)
@@ -156,11 +157,14 @@ List the Trash areas you can open, to pick an `areaNodeId` for `files/trash/list
 - Body: `{ cursor?, limit? }`. `limit` is 1 to 100 (default 100). While `cursor` in the answer is not `null`, call again with it.
 - It needs `files:list`. A personal key works, and so does a key bound to a service account: its areas are the restricted folders shared with the account or its role. A guest gets 403.
 - Success: `{ areas: [{ areaNodeId, path }], cursor, isDone }`. The first page starts with the open part of the workspace (`areaNodeId: null`, `path: "/"`) when the key can open the workspace root. Then come the restricted folders you can open, by path. A restricted folder in Trash is not an area.
+- Personal-model plugin frames and runs page their selected folders in consent order. They get no open area. Their list may include ordinary folders and folders in Trash. Use a returned ID as `folderNodeId` to list an ordinary folder's deleted children; `areaNodeId` still means a restricted area. The same capability and guest/scheduled-run rules as Trash list apply.
 - A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor.
 
 ## Restore (`files/restore`)
 
 Bring back deleted items, like Restore in the app Trash.
+
+Restore works with keys only. Plugin frames, runs and service grants cannot restore yet.
 
 - Body: `{ paths | nodes, onConflict?, requestId?, dryRun? }`. `paths` is 1 to 100 absolute paths of deleted items, with no repeats, not `/`. Split a longer list into several calls. `requestId` works like in `move`; it is required unless `dryRun` is `true`.
 - `nodes` picks items from `files/trash/list` instead of paths: `[{ nodeId, archiveOperationId }]`, 1 to 100, with no repeated `nodeId`. Use it when several deleted items have one path. Send `paths` or `nodes`, not both.

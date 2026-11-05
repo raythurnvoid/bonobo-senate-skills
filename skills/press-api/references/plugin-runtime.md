@@ -18,9 +18,27 @@ Exchange returns a token, expiry, scopes, stable principal key, and installation
 
 Save `requestId` before sending a lifecycle request. If its reply is lost, recover with that exact ID, operation, original bearer, and original seal destination. Recovery returns only the saved result while it remains current. The saved credential can be recovered for at most 24 hours. Do not start another exchange or rotation just because the first reply timed out.
 
+Source credentials and the current service secret are checked even without
+`requestId`. Personal grants keep the source's exact file-consent pair. A sealed
+destination limits location; it does not add permission. After an installation
+switches to personal consent, old tokens cannot mint, seal, renew or recover a
+usable token. Start from a fresh frame. Accepted uploads keep their original consent
+pin so they can finish under the same rules.
+
 ## Plugin folders and conditional writers
 
-Ordinary file operations are described in [Files](files.md). Plugin file writes also require the correct labels and the accepted own-write capability. Every plugin file call needs the person and the installation's service account to pass the normal file check. A label or a writer does not grant file access. A folder a plugin creates is a regular folder with its parent's access; the plugin cannot choose its readers. The old `workspace.files.own-access` capability is removed, and a new manifest that asks for it is refused.
+Ordinary file operations are described in [Files](files.md). Plugin file writes also
+require the correct labels and the accepted own-write capability. Personal-model
+credentials need applied file consent from **My file permissions**. A label, writer
+or account grant does not add file access. A plugin-created folder keeps its parent's
+sharing; the plugin cannot choose its readers. The old `workspace.files.own-access`
+capability is removed, and a new manifest that asks for it is refused.
+
+Upload runs need Can view on the source before receiving its file metadata. Creating
+a sibling needs Can edit on the parent too. Selecting only the source cannot grant
+that. Added `bonobo-file://` references need Can view. Trash list and areas accept
+personal-model frames and runs with `workspace.files.read`, except scheduled runs.
+Plugin Restore is not available yet.
 
 Invoke Runs and registered sealed writers use these shared routes:
 
