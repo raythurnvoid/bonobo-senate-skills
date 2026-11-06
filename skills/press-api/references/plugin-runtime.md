@@ -20,13 +20,13 @@ Save `requestId` before sending a lifecycle request. If its reply is lost, recov
 
 Source credentials and the current service secret are checked even without
 `requestId`. Grants keep the source's exact file-consent pair. A sealed destination
-limits location; it does not add permission. A missing or null pair cannot mint,
-seal, renew or recover a usable token. Start from a fresh frame. Accepted uploads
-keep their original pair and account; a fresh connection cannot adopt a request
-with a missing, null, or different pair. It can manage saved old output when current
-consent allows it. Plugin-data reservations keep their installation owner across
-connections, so a fresh connection can finish and replay the same versioned write
-without another charge.
+limits location; it does not add permission. Null pairs keep history and grant no
+access. A missing or null pair cannot mint, seal, renew or recover a usable token.
+Start from a fresh frame. Accepted uploads keep their original pair and account;
+a fresh connection cannot adopt a request with a missing, null, or different pair.
+It can manage saved old output when current consent allows it. Plugin-data
+reservations keep their installation owner across connections, so a fresh
+connection can finish and replay the same versioned write without another charge.
 
 ## Plugin folders and conditional writers
 
