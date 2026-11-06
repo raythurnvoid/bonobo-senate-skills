@@ -19,16 +19,19 @@ Exchange returns a token, expiry, scopes, stable principal key, and installation
 Save `requestId` before sending a lifecycle request. If its reply is lost, recover with that exact ID, operation, original bearer, and original seal destination. Recovery returns only the saved result while it remains current. The saved credential can be recovered for at most 24 hours. Do not start another exchange or rotation just because the first reply timed out.
 
 Source credentials and the current service secret are checked even without
-`requestId`. Personal grants keep the source's exact file-consent pair. A sealed
-destination limits location; it does not add permission. After an installation
-switches to personal consent, old tokens cannot mint, seal, renew or recover a
-usable token. Start from a fresh frame. Accepted uploads keep their original consent
-pin so they can finish under the same rules.
+`requestId`. Grants keep the source's exact file-consent pair. A sealed destination
+limits location; it does not add permission. A missing or null pair cannot mint,
+seal, renew or recover a usable token. Start from a fresh frame. Accepted uploads
+keep their original pair and account; a fresh connection cannot adopt a request
+with a missing, null, or different pair. It can manage saved old output when current
+consent allows it. Plugin-data reservations keep their installation owner across
+connections, so a fresh connection can finish and replay the same versioned write
+without another charge.
 
 ## Plugin folders and conditional writers
 
 Ordinary file operations are described in [Files](files.md). Plugin file writes also
-require the correct labels and the accepted own-write capability. Personal-model
+require the correct labels and the accepted own-write capability. Plugin
 credentials need applied file consent from **My file permissions**. A label, writer
 or account grant does not add file access. A plugin-created folder keeps its parent's
 sharing; the plugin cannot choose its readers. The old `workspace.files.own-access`
@@ -37,7 +40,7 @@ capability is removed, and a new manifest that asks for it is refused.
 Upload runs need Can view on the source before receiving its file metadata. Creating
 a sibling needs Can edit on the parent too. Selecting only the source cannot grant
 that. Added `bonobo-file://` references need Can view. Trash list and areas accept
-personal-model frames and runs with `workspace.files.read`, except scheduled runs.
+frames and runs with `workspace.files.read`, except scheduled runs.
 Plugin Restore is not available yet.
 
 Invoke Runs and registered sealed writers use these shared routes:
@@ -87,6 +90,9 @@ New targets keep their original service account. Before text conversion adds fil
 
 `/api/v1/plugins/identity/exchange` takes `{ exchangeId, requestedExpiresAt }`, a Frame bearer, and the service secret. It returns `{ jwt }`: a short identity lease for this installation, audience, user, and membership lifetime. Its expiry is at most 30 seconds after validation, also bounded by the frame and requested expiry. It grants no Files or store access by itself.
 
+The frame must keep its original valid personal pair and membership lifetime.
+After account recovery, reopen the page. Its old frame cannot get a new lease.
+
 The next routes use the service-secret header and that verified installation connection:
 
 - `/api/v1/plugins/members/list`: `{ installationId, cursor: null, startRevision: null }` starts a snapshot. It returns up to 50 `members`, `startRevision`, `currentRevision`, and `continueCursor`. Preserve the returned start revision and follow its cursor until null.
@@ -98,7 +104,7 @@ A plugin that declares the `workspace.access.changed` event and a `serviceEvents
 
 ## Volumes, invocation, and follow-ups
 
-The five `/api/v1/volumes/` routes require a Run with `volumes:write`, accepted Mounts capability, and current installation management. Scheduled volume calls remain unsupported. Volumes are read-only agent source mounts, not ordinary workspace Files.
+The five `/api/v1/volumes/` routes require a Run with `volumes:write`, accepted Mounts capability, and current installation management. Scheduled runs also check their pinned Run as me grant. Volumes are read-only agent source mounts, not ordinary workspace Files.
 
 | Suffix | Body | Result |
 | --- | --- | --- |

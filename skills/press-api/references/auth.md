@@ -25,7 +25,7 @@ Personal keys may also have `files:publish`, `plugin_data:read`, `plugin_data:wr
 
 Each person chooses saved files, folders or **Whole workspace** in **My file permissions**
 for a plugin installation. Whole workspace covers the root and current and future
-open files. Restricted folders need separate consent. Personal-model credentials
+open files. Restricted folders need separate consent. Plugin credentials
 use the applied Can view / Can edit level.
 Access updates apply in background steps. Calls keep the current applied level until
 its step finishes. Account grants and owner rights do not add plugin access.
@@ -33,9 +33,9 @@ Credentials still need the live installation and the same membership lifetime.
 A plugin-created folder keeps ordinary parent sharing. Store scopes and accepted
 capabilities remain separate from Files permissions.
 
-Old installations keep their earlier account checks until their audited switch.
-Start a fresh frame or run after the switch. Old tokens cannot start new file writes,
-seals or renewals, but already accepted writes may finish under their saved rules.
+Every live plugin credential needs its original personal pair. Missing or null
+pairs cannot use Files or plugin data, renew, seal, or recover a token. Start a
+fresh frame, run, or service connection when the API asks you to do so.
 
 POST `/api/v1/auth/verify` with a personal or service key. It returns `{ organizationId, workspaceId, scopes, serviceAccountId, sponsorUserId }`. The scope list reflects current usable scopes. It does not prove access to a specific file. An empty scope list is a valid result. Rotation revokes the old key; use the new credential and restart old paged reads.
 
