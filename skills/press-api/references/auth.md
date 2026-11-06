@@ -23,8 +23,10 @@ Files scopes describe the operation: `files:list`, `files:read`, `files:write`, 
 
 Personal keys may also have `files:publish`, `plugin_data:read`, `plugin_data:write`, and `ai_chat:read`. These start unchecked. `files:publish` turns the public flag of an image or video file on or off. `ai_chat:read` reads only the key user's own AI conversations in that workspace, including when that user is a guest. No service key, plugin token, or short grant receives either scope. Existing keys do not gain new scopes automatically.
 
-Each person chooses saved files or folders in **My file permissions** for a plugin
-installation. Personal-model credentials use the applied Can view / Can edit level.
+Each person chooses saved files, folders or **Whole workspace** in **My file permissions**
+for a plugin installation. Whole workspace covers the root and current and future
+open files. Restricted folders need separate consent. Personal-model credentials
+use the applied Can view / Can edit level.
 Access updates apply in background steps. Calls keep the current applied level until
 its step finishes. Account grants and owner rights do not add plugin access.
 Credentials still need the live installation and the same membership lifetime.
