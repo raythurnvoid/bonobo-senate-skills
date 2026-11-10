@@ -13,12 +13,12 @@ Request bodies are strict. A field a route does not know returns 400 with a mess
 | `/api/v1/files/stat` | POST | client | Key | `files:list` | none | [Files](files.md) |
 | `/api/v1/files/mkdir` | POST | client | Key | `files:write` | none | [Files](files.md) |
 | `/api/v1/files/delete` | POST | client | Key | `files:write` | none | [Files](files.md) |
-| `/api/v1/files/restore` | POST | client | Key | `files:write` | none | [Files](files.md) |
+| `/api/v1/files/restore` | POST | client | Key, Run (not scheduled) | Key: `files:write`; Run: `files:restore` | none | [Files](files.md) |
 | `/api/v1/files/trash/list` | POST | client | Key, Frame or Run (not scheduled) | `files:list` | none | [Files](files.md#trash-filestrashlist) |
 | `/api/v1/files/trash/areas` | POST | client | Key, Frame or Run (not scheduled) | `files:list` | none | [Files](files.md#trash-areas-filestrashareas) |
 | `/api/v1/files/move` | POST | client | Key | `files:write` | none | [Files](files.md) |
 | `/api/v1/files/copy` | POST | client | Key | `files:write`, `files:read`, `files:download` | none | [Files](files.md) |
-| `/api/v1/files/jobs/get` | POST | client | Key | `files:list` | none | [Files](files.md) |
+| `/api/v1/files/jobs/get` | POST | client | Key, Frame or Run (not scheduled) | `files:list` | none | [Files](files.md) |
 | `/api/v1/files/read` | POST | client | Key, Short grant, Frame, Run | Text: `files:read` (keys/grants also accept `files:download`); binary: `files:download`, Key or Short grant only | none | [Files](files.md) |
 | `/api/v1/files/read-only/get` | POST | client | Key | `files:read` | none | [Files](files.md) |
 | `/api/v1/files/read-only/set` | POST | client | Key | `files:read-only` | none | [Files](files.md) |

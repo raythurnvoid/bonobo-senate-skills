@@ -41,7 +41,8 @@ Upload runs need Can view on the source before receiving its file metadata. Crea
 a sibling needs Can edit on the parent too. Selecting only the source cannot grant
 that. Added `bonobo-file://` references need Can view. Trash list and areas accept
 frames and runs with `workspace.files.read`, except scheduled runs.
-Plugin Restore is not available yet.
+A run with `workspace.files.restore` can restore Trash items with `files/restore`, and
+frames and runs read those jobs with `files/jobs/get`. The SDK README has that contract.
 
 Invoke Runs and registered sealed writers use these shared routes:
 

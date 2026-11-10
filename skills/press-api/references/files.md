@@ -164,7 +164,7 @@ List the Trash areas you can open, to pick an `areaNodeId` for `files/trash/list
 
 Bring back deleted items, like Restore in the app Trash.
 
-Restore works with keys only. Plugin frames, runs and service grants cannot restore yet.
+This section is for keys. A plugin run with `workspace.files.restore` can restore too, and its frames and runs read those jobs with `jobs/get`. Plugin answers use other messages and paths; see the plugin SDK README. Plugin frames and service grants cannot restore.
 
 - Body: `{ paths | nodes, onConflict?, requestId?, dryRun? }`. `paths` is 1 to 100 absolute paths of deleted items, with no repeats, not `/`. Split a longer list into several calls. `requestId` works like in `move`; it is required unless `dryRun` is `true`.
 - `nodes` picks items from `files/trash/list` instead of paths: `[{ nodeId, archiveOperationId }]`, 1 to 100, with no repeated `nodeId`. Use it when several deleted items have one path. Send `paths` or `nodes`, not both.
