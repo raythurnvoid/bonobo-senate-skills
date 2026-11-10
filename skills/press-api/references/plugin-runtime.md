@@ -37,6 +37,10 @@ or account grant does not add file access. A plugin-created folder keeps its par
 sharing; the plugin cannot choose its readers. The old `workspace.files.own-access`
 capability is removed, and a new manifest that asks for it is refused.
 
+New file choices need live items. Restore an item in Trash before selecting it in
+**My file permissions**. A choice saved earlier keeps working in Trash while applied
+consent allows it. Removing a choice stays allowed.
+
 Upload runs need Can view on the source before receiving its file metadata. Creating
 a sibling needs Can edit on the parent too. Selecting only the source cannot grant
 that. Added `bonobo-file://` references need Can view. Trash list and areas accept
