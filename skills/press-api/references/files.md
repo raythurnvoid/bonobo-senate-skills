@@ -131,7 +131,7 @@ Move files and folders to Trash, like `rm -r` with several paths.
 - It moves what it can to Trash and refuses each bad path alone. `restore` and the app Trash bring items back.
 - Success: `{ jobId, isDone, refused: [{ path, message }] }`. `refused` names missing paths (`Not found`), locked paths and paths inside a locked folder (`Permission denied`), and items the job refused, such as a read-only file inside a folder.
 - A big folder goes on in the background: `isDone: false` with a `jobId`. `jobId` is `null` when nothing is left to follow.
-- An item that is already in Trash is skipped, like `rm -f`, so a retry is safe.
+- A retry is safe: nothing is deleted twice. A path that is already in Trash is no longer at that path, so the retry lists it in `refused` as `Not found` and gives no `jobId`, also while the first job still runs. After a lost answer, check the path with `files/stat` and find the item in `files/trash/list`.
 - 429 means too many changes in a row; wait `retryAfterMs`.
 
 ## Trash (`files/trash/list`)
