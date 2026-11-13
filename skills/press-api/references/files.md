@@ -47,7 +47,7 @@ List the children of a folder, or everything below it.
 
 - Body: `{ path, cursor: null, limit: 100 }`. Optional: `recursive`, `kind: "file" | "folder"`, `extension`, `contentTypePrefixes`, and `order: "asc" | "desc"`. `scanLimit` is accepted and ignored. The page size is at most 100.
 - Order: without `recursive`, direct children in name order, or reverse name order with `order: "desc"`. A cursor works only with the order it was made for. With `recursive: true`, path order.
-- Success: `{ items, cursor, isDone }`. Items have `path`, `name`, `kind`, `nodeId`, `contentType`, `updatedAt`, `status`, `size`, and `locked`. A file's status is `pending` until its upload is confirmed, then `ready`. Folders and locked items have `status: null`. Missing sizes are `null`.
+- Success: `{ items, cursor, isDone }`. Items have `path`, `name`, `kind`, `nodeId`, `contentType`, `updatedAt`, `status`, `size`, `locked`, and `readOnly`. A file's status is `pending` until its upload is confirmed, then `ready`. Folders and locked items have `status: null`. Missing sizes are `null`. `readOnly` is the item's own flag, or `null` for a locked item. A parent's true flag does not make its child's field true.
 - Pages: keep every other field unchanged while you follow `cursor`. Stop when `isDone` is `true`; the last page has `cursor: null`. A short page is not the end. Move, Rename, access context, or membership changes can end a cursor. On 400 `errorCode: "invalid_cursor"`, start again with `cursor: null` and skip node IDs you already have. Do not inspect or edit the sealed cursor.
 - Filters: `extension: "md"` selects one extension. For type families, use `recursive: true` and 1 to 8 `contentTypePrefixes`, with no extension. Values are whole families such as `image/` or exact types such as `image/png`; `image/p` is an exact type, not a prefix search. Filters use indexes. Narrowing the output does not open locked folders.
 - Locked items: list a readable folder to see its locked children. A locked row gives file facts, not content or custom fields. Recursive reads show a locked folder once and never enter it. A guest with an exact folder share may get 403 for `/`; list the shared path instead.
@@ -234,10 +234,13 @@ Get temporary download links by node ID.
 
 The local Read-only flag stops normal changes to one item.
 
-- `read-only/get` takes `{ nodeId }` and returns `{ nodeId, readOnly, canEdit }`. `read-only/set` takes `{ nodeId, readOnly }`, where `readOnly` is a boolean.
+- `files/read-only/get` takes `{ nodeId }` or `{ path }` and returns `{ nodeId, readOnly, canEdit }`. It needs `files:read`.
+- `files/read-only/set` takes `{ nodeId, readOnly }` or `{ path, readOnly }`, where `readOnly` is a boolean, and returns `{ nodeId }`. Path lookup and the flag write happen together, so a moved item cannot leave a stale target.
+- Supply exactly one target. A path starts with `/` and cannot be the workspace root. Bad bodies and paths are 400. A denied path or a name below a locked folder is 403; a missing name in a readable place is 404. ID requests keep 404 for missing or unavailable items.
+- CLI: `readonly get <path>`, `readonly set <path>`, and `readonly clear <path>`. Set and clear do not need a separate stat call or `files:list` scope.
 - Setting or clearing the flag needs `files:read-only` and current Can edit on the target. A scope alone grants no file access.
 - A folder's flag also guards its direct child list, but not content deeper inside. It is separate from sharing.
-- Supported machine writes may send explicit `force: true` with `files:read-only` to pass the flag check. Force never grants access or clears the flag.
+- Supported machine writes may send explicit `force: true` with `files:read-only` to pass the flag check. CLI `rm --force` sends it for a move to Trash. Force never grants access or clears the flag.
 
 ## Public flag (`files/public/set`)
 

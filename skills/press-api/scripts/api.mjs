@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.6.4";
+const VERSION = "1.6.5";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -36,7 +36,9 @@ Files:
   write <path> --from <file | -> [--if-revision <revision>]
                                   Create a text file or replace its whole text. - reads stdin.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
-  rm <path>... [--wait]           Move files and folders to Trash, like rm -r. restore brings them back.
+  readonly get|set|clear <path>  Read, set, or clear one item's local Read-only flag.
+  rm <path>... [--wait] [--force] Move files and folders to Trash, like rm -r. restore brings them back.
+                                  --force overrides Read-only with the files:read-only scope.
   trash [--area <node id>] [--all] [--cursor <c>]
                                   List what is in Trash, newest delete first. --area lists inside one
                                   restricted folder. --all follows every page.
@@ -557,15 +559,37 @@ async function command_mkdir(args) {
 }
 
 async function command_rm(args) {
-	const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { wait: { type: "boolean" } } });
+	const { values, positionals } = parseArgs({
+		args,
+		allowPositionals: true,
+		options: { wait: { type: "boolean" }, force: { type: "boolean" } },
+	});
 	check_workspace_paths(positionals);
 
 	const credentials = load_credentials();
-	const deleted = await post_json(credentials, "files/delete", { paths: positionals });
+	const deleted = await post_json(credentials, "files/delete", {
+		paths: positionals,
+		...(values.force ? { force: true } : {}),
+	});
 	// A job that ends later can still refuse items inside a folder. Read them from the job.
 	const job = values.wait && deleted.jobId && !deleted.isDone ? await wait_for_job(credentials, deleted.jobId) : null;
 	print_json({ ...deleted, ...(job ? { job } : {}) });
 	return deleted.refused.length > 0 || (job && job.status !== "succeeded") ? 1 : 0;
+}
+
+async function command_readonly(args) {
+	const { positionals } = parseArgs({ args, allowPositionals: true, options: {} });
+	const [action, workspacePath] = positionals;
+	if (positionals.length !== 2 || !["get", "set", "clear"].includes(action)) {
+		throw new UsageError(`Use readonly get|set|clear <path>.\n\n${USAGE}`);
+	}
+	check_workspace_paths([workspacePath]);
+	print_json(
+		await post_json(load_credentials(), `files/read-only/${action === "get" ? "get" : "set"}`, {
+			path: workspacePath,
+			...(action === "get" ? {} : { readOnly: action === "set" }),
+		}),
+	);
 }
 
 async function command_trash(args) {
@@ -1081,6 +1105,7 @@ const commands = {
 	stat: command_stat,
 	mkdir: command_mkdir,
 	rm: command_rm,
+	readonly: command_readonly,
 	trash: command_trash,
 	restore: command_restore,
 	mv: (args) => command_transfer("move", args),

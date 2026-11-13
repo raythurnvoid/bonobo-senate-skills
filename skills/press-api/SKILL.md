@@ -3,7 +3,7 @@ name: press-api
 description: Upload, list, read, and organize files in a Bonobo Senate workspace from your computer with an API key, through the public API and its helper CLI. Use it to bulk-upload folders, make folders, move, rename, copy, delete, list the Trash, or restore files, check paths, read files, call any /api/v1 route, work with plugin data, or read saved AI conversations. Inside the app, it covers the allowed Files reads in execute_code. It is a client guide, not a guide to changing the Bonobo Senate backend.
 compatibility: Node 22 or newer, and network access to the API origin.
 metadata:
-  version: "1.6.4"
+  version: "1.6.5"
 ---
 
 # Bonobo Senate API client
@@ -18,6 +18,9 @@ The helper CLI is [api.mjs](scripts/api.mjs). Run it by its full path: `node <th
 2. `ls /`, `stat <path>... [--expect missing]`, `read <path> --to <file>`, `write <path> --from <file>`, `mkdir <path>...`, `rm <path>... --wait`, `trash`, `trash areas`, `restore <path>... --dry-run`, `restore <path>... --wait`, `mv <path>... <to> --wait`, `cp <path>... <to> --wait`, `edit <path> --old-file <file> --new-file <file>`, `append <path> --from <file>`. Add `--if-revision <revision>` to change a text file only if nobody changed it since your read: see [change a text file safely](references/files.md#change-a-text-file-safely).
 3. `upload <local folder or file>... --to /<folder> --dry-run`, then the same without `--dry-run`. Add `--wait` to wait until the files are ready, and `--skip-existing` to resume a stopped upload. Names must already be clean (lowercase, no spaces): see [upload](references/upload.md) step 2.
 4. `call <route> <json>` sends any route from the [route index](references/route-index.md).
+
+Use `readonly get|set|clear <path>` for one item's local Read-only flag. `rm --force`
+explicitly passes that flag with a `files:read-only` grant. It still moves items to Trash.
 
 Exit codes: 0 ok, 1 the API refused something (the JSON says what), 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key. Read [setup](references/setup.md) for every command's details and the Windows notes.
 

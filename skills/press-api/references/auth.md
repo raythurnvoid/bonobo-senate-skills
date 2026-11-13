@@ -19,7 +19,7 @@ These short names are used in the [route index](route-index.md).
 | Registered service | Publisher's registered service secret | Only the identity/access contracts that also prove the required connection or frame. |
 | App session | App-user JWT | Browser/system routes. A public API key cannot replace it. |
 
-Files scopes describe the operation: `files:list`, `files:read`, `files:write`, `files:download`, and `files:permissions`. Each target still has an access check. A guest without workspace-wide Files read can open an exact shared path. Listing `/` can return 403 while that path works. A service key uses the account's grants, not the sponsor's file access.
+Files scopes describe the operation: `files:list`, `files:read`, `files:write`, `files:download`, `files:permissions`, and `files:read-only`. Each target still has an access check. A guest without workspace-wide Files read can open an exact shared path. Listing `/` can return 403 while that path works. A service key uses the account's grants, not the sponsor's file access.
 
 Personal keys may also have `files:publish`, `plugin_data:read`, `plugin_data:write`, and `ai_chat:read`. These start unchecked. `files:publish` turns the public flag of an image or video file on or off. `ai_chat:read` reads only the key user's own AI conversations in that workspace, including when that user is a guest. No service key, plugin token, or short grant receives either scope. Existing keys do not gain new scopes automatically.
 
@@ -37,7 +37,7 @@ Every live plugin credential needs its original personal pair. Missing or null
 pairs cannot use Files or plugin data, renew, seal, or recover a token. Start a
 fresh frame, run, or service connection when the API asks you to do so.
 
-POST `/api/v1/auth/verify` with a personal or service key. It returns `{ organizationId, workspaceId, scopes, serviceAccountId, sponsorUserId }`. The scope list reflects current usable scopes. It does not prove access to a specific file. An empty scope list is a valid result. Rotation revokes the old key; use the new credential and restart old paged reads.
+POST `/api/v1/auth/verify` with a personal or service key. It returns `{ organizationId, workspaceId, organizationName, workspaceName, scopes, serviceAccountId, sponsorUserId }`. Names are the current names of the key's own tenant. The scope list reflects current usable scopes. It does not prove access to a specific file. An empty scope list is a valid result. Rotation revokes the old key; use the new credential and restart old paged reads.
 
 ## Errors and retries
 

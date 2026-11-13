@@ -10,7 +10,7 @@ Exit codes: 0 ok, 1 the API refused something or an upload failed, 2 usage error
 
 ## 1. Check for a key
 
-Run `status` first. It prints where the key came from, the API origin, and the result of `/api/v1/auth/verify` (organization, workspace, scopes). It never prints the key.
+Run `status` first. It prints where the key came from, the API origin, and the result of `/api/v1/auth/verify` (organization and workspace names and IDs, scopes). It never prints the key.
 
 - Exit 0: the key works. Check that its scopes cover the task, then go on.
 - Exit 4: no key is set up. Go to step 2.
@@ -86,6 +86,9 @@ node <skill folder>/scripts/api.mjs ls /Inbox --all
 node <skill folder>/scripts/api.mjs stat /Inbox/a.md /Inbox/old
 node <skill folder>/scripts/api.mjs mkdir /Projects/2026/Q1 /Projects/2026/Q2
 node <skill folder>/scripts/api.mjs rm /Inbox/old /Inbox/tmp.md --wait
+node <skill folder>/scripts/api.mjs readonly get /Inbox/tmp.md
+node <skill folder>/scripts/api.mjs readonly set /Inbox/tmp.md
+node <skill folder>/scripts/api.mjs readonly clear /Inbox/tmp.md
 node <skill folder>/scripts/api.mjs trash --all
 node <skill folder>/scripts/api.mjs trash areas
 node <skill folder>/scripts/api.mjs restore /Inbox/old --dry-run
@@ -108,7 +111,8 @@ node <skill folder>/scripts/api.mjs cp /Projects/2026/Q1 /Backup/2026/Q1 --paren
   esac
   ```
 - `mkdir` works like `mkdir -p`, all or nothing: one refused path makes no folder.
-- `rm` moves files and folders to Trash, like `rm -r`. `restore` or the app Trash brings them back. It refuses a missing or locked path alone and moves the rest to Trash. A big folder goes on in the background: `--wait` waits for the job, and `job <job id> --wait` reads it later. A key bound to a service account deletes only what the account itself may change.
+- `readonly get|set|clear <path>` reads or changes one item's local flag. Get needs `files:read`. Set and clear need `files:read-only` and current Can edit, with no extra `files:list` scope. A folder flag does not turn its children's flags on.
+- `rm` moves files and folders to Trash, like `rm -r`. `restore` or the app Trash brings them back. It refuses a missing or locked path alone and moves the rest to Trash. `--force` explicitly passes Read-only with the `files:read-only` scope, while keeping the flag and all access checks. A big folder goes on in the background: `--wait` waits for the job, and `job <job id> --wait` reads it later. A key bound to a service account deletes only what the account itself may change.
 - `restore` brings back each selected item and the items inside it that were moved to Trash with it. A file comes back alone. Other items from that `rm` stay in Trash. An item comes back where it was, or at the workspace root when its folder is gone or stays in Trash. When an item with the same name is there, it comes back with a new name such as `notes-2.md` (`--on-conflict keep_both`, the default); `--on-conflict skip` leaves it deleted. Only the jobs name these items, so use `--wait` to see them: each job's `renamed` lists every item with its new path, and its `refused` lists the items that stayed deleted. Without `--wait`, read each job later with `job <job id>`. It takes at most 100 paths or nodes per call. If a job stops partway (for example Keep both found no free name), the job's `refused` names a path still in the Trash: fix the reason, then restore that item. Check the other paths you restored too; they may need separate restores. It refuses a path alone when nothing deleted is there, when the path was deleted more than once (find the one you want with `trash`, then use `--node`), or when it is locked. It prints `Request id: <id>` on stderr like `mv`; rerun with `--request-id <that id>` after a lost answer. `--wait` waits for every job, and exits 1 when a job fails or leaves an item in the Trash, also with `--on-conflict skip`. It needs `files:write`; `--wait` and `job` need `files:list` too. A key bound to a service account also works and restores only what the account may change.
 - `trash` lists what is in Trash, newest delete first, 100 items per page: `--all` follows every page, and `--cursor` goes on from a page. It lists what the app Trash shows, not the items inside a deleted folder. `--area <node id>` lists inside one restricted folder. `trash areas` lists the areas you can open, the workspace first (`areaNodeId: null`); `--all` follows every page. Pass an `areaNodeId` to `--area`. It needs `files:list`. A key bound to a service account also works and sees only what the account may open. An account with grants only on folders gets 403 without `--area`: use an area from `trash areas`, or list one folder with `call POST /api/v1/files/trash/list` and a `folderNodeId` body field ([files](files.md)).
 - `restore --node <node id>:<archive operation id>` picks one item from `trash`, also when several deleted items have one path. Repeat `--node` for more items. Give paths or `--node`, not both.
