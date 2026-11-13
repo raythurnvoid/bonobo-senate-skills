@@ -126,12 +126,12 @@ Make folders, like `mkdir -p`.
 
 Move files and folders to Trash, like `rm -r` with several paths.
 
-- Body: `{ paths }`, 1 to 200 absolute paths with no repeats, not `/`. Split a longer list into several calls.
+- Body: `{ paths, requestId }`, 1 to 200 absolute paths with no repeats, not `/`. Split a longer list into several calls. `requestId` works like in `move`.
 - A key bound to a service account deletes only what the account itself may change.
 - It moves what it can to Trash and refuses each bad path alone. `restore` and the app Trash bring items back.
 - Success: `{ jobId, isDone, refused: [{ path, message }] }`. `refused` names missing paths (`Not found`), locked paths and paths inside a locked folder (`Permission denied`), and items the job refused, such as a read-only file inside a folder.
-- A big folder goes on in the background: `isDone: false` with a `jobId`. `jobId` is `null` when nothing is left to follow.
-- A retry is safe: nothing is deleted twice. A path that is already in Trash is no longer at that path, so the retry lists it in `refused` as `Not found` and gives no `jobId`, also while the first job still runs. After a lost answer, check the path with `files/stat` and find the item in `files/trash/list`.
+- A delete that moved something to Trash always has a `jobId`. A big folder goes on in the background: `isDone: false`. `jobId` is `null` only when every path was refused.
+- Send the same `requestId` and body again after a lost answer: you get the same `jobId` and the same `refused` back for 7 days after the job ends, and nothing new is deleted, even if a new item took the path since. The same `requestId` with another body is 409. A delete that refused every path saves nothing, so its retry runs again.
 - 429 means too many changes in a row; wait `retryAfterMs`.
 
 ## Trash (`files/trash/list`)

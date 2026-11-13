@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.6.6";
+const VERSION = "1.6.7";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -37,8 +37,10 @@ Files:
                                   Create a text file or replace its whole text. - reads stdin.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
   readonly get|set|clear <path>  Read, set, or clear one item's local Read-only flag.
-  rm <path>... [--wait] [--force] Move files and folders to Trash, like rm -r. restore brings them back.
+  rm <path>... [--wait] [--force] [--request-id <id>]
+                                  Move files and folders to Trash, like rm -r. restore brings them back.
                                   --force overrides Read-only with the files:read-only scope.
+                                  Rerun with the printed request id after a lost answer.
   trash [--area <node id>] [--all] [--cursor <c>]
                                   List what is in Trash, newest delete first. --area lists inside one
                                   restricted folder. --all follows every page.
@@ -562,18 +564,23 @@ async function command_rm(args) {
 	const { values, positionals } = parseArgs({
 		args,
 		allowPositionals: true,
-		options: { wait: { type: "boolean" }, force: { type: "boolean" } },
+		options: { wait: { type: "boolean" }, force: { type: "boolean" }, "request-id": { type: "string" } },
 	});
 	check_workspace_paths(positionals);
 
 	const credentials = load_credentials();
+	// The same request id returns the same job, so a rerun after a lost answer deletes nothing new at
+	// these paths. Print it before the call, so it is there even when the answer is lost.
+	const requestId = values["request-id"] ?? crypto.randomUUID();
+	process.stderr.write(`Request id: ${requestId}\n`);
 	const deleted = await post_json(credentials, "files/delete", {
 		paths: positionals,
 		...(values.force ? { force: true } : {}),
+		requestId,
 	});
 	// A job that ends later can still refuse items inside a folder. Read them from the job.
 	const job = values.wait && deleted.jobId && !deleted.isDone ? await wait_for_job(credentials, deleted.jobId) : null;
-	print_json({ ...deleted, ...(job ? { job } : {}) });
+	print_json({ requestId, ...deleted, ...(job ? { job } : {}) });
 	return deleted.refused.length > 0 || (job && job.status !== "succeeded") ? 1 : 0;
 }
 
