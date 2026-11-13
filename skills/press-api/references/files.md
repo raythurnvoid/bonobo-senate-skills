@@ -132,6 +132,7 @@ Move files and folders to Trash, like `rm -r` with several paths.
 - Success: `{ jobId, isDone, refused: [{ path, message }] }`. `refused` names missing paths (`Not found`), locked paths and paths inside a locked folder (`Permission denied`), and items the job refused, such as a read-only file inside a folder.
 - A delete that moved something to Trash always has a `jobId`. A big folder goes on in the background: `isDone: false`. `jobId` is `null` only when every path was refused.
 - Send the same `requestId` and body again after a lost answer: you get the same `jobId` and the same `refused` back for 7 days after the job ends, and nothing new is deleted, even if a new item took the path since. The same `requestId` with another body is 409. A delete that refused every path saves nothing, so its retry runs again.
+- Read `jobs/get` for the final result, even when a retry says `isDone: true`. The first answer may not include later failures. The helper's `rm --wait` reads it and exits 1 for a failed job or any refused item.
 - 429 means too many changes in a row; wait `retryAfterMs`.
 
 ## Trash (`files/trash/list`)
@@ -203,7 +204,7 @@ Read a job that `delete`, `restore`, `move`, or `copy` started.
 - Body: `{ jobId, cursor? }`.
 - Success: `{ jobId, kind: "delete" | "restore" | "move" | "copy", status, progress, errorMessage, refused: [{ path, message }] (a restore by `nodes` also has `nodeId`), renamed: [{ path, newPath }], refusedCursor }`.
 - `status` is `queued`, `running`, `succeeded`, `partial` (some items were refused), `failed`, `timed_out`, or `canceled`.
-- Refused items: for a delete job, a refused `path` is `null` when the key can no longer read that item. A move or copy job keeps the paths it saw when it ran. A copy skips a locked item inside a copied folder and lists it there with `Permission denied`.
+- Refused items: a delete job keeps the first answer's refusals and adds later ones, without exact path-and-message repeats. Saved refusals may keep old paths. A live item path is `null` when the key can no longer read it. A move or copy job keeps the paths it saw when it ran. A copy skips a locked item inside a copied folder and lists it there with `Permission denied`.
 - Pages: a move, copy, or restore job gives its items 100 at a time. While `refusedCursor` is not `null`, call again with `cursor: <refusedCursor>`. The paths refused at the start come on the first page only. A delete job has all of them on one page.
 - A job that still runs can list more items later, so read it again after it ends.
 - Restore jobs: the last job of a restore lists the paths and nodes the restore refused. `renamed` lists each item that Keep both brought back under a new name: `path` is where the item was when it was deleted, and `newPath` is where it came back. `refused` lists each item that `skip` left in the Trash, with the path it keeps there. A skip does not make the job `partial`. Move and copy never rename, so their `renamed` is empty.

@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.6.7";
+const VERSION = "1.6.8";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -578,10 +578,10 @@ async function command_rm(args) {
 		...(values.force ? { force: true } : {}),
 		requestId,
 	});
-	// A job that ends later can still refuse items inside a folder. Read them from the job.
-	const job = values.wait && deleted.jobId && !deleted.isDone ? await wait_for_job(credentials, deleted.jobId) : null;
+	// A retry can find a finished job. Read it too, so later failures and refusals stay visible.
+	const job = values.wait && deleted.jobId ? await wait_for_job(credentials, deleted.jobId) : null;
 	print_json({ requestId, ...deleted, ...(job ? { job } : {}) });
-	return deleted.refused.length > 0 || (job && job.status !== "succeeded") ? 1 : 0;
+	return deleted.refused.length > 0 || (job && (job.status !== "succeeded" || job.refused.length > 0)) ? 1 : 0;
 }
 
 async function command_readonly(args) {
