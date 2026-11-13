@@ -10,7 +10,7 @@ Exit codes: 0 ok, 1 the API refused something or an upload failed, 2 usage error
 
 ## 1. Check for a key
 
-Run `status` first. It prints where the key came from, the API origin, and the result of `/api/v1/auth/verify` (organization and workspace names and IDs, scopes). It never prints the key.
+Run `status` first. It prints where the key came from, the API origin, and the result of `/api/v1/auth/verify` (organization and workspace names and IDs, scopes). It never prints the key. It also reads the public skill index at `<origin>/.well-known/agent-skills/index.json`, without the key, and prints the press-api version that API serves as `servedVersion` (`null` when it cannot read it). When that version differs from this copy, `status` says so on stderr. The index lists a zip of the skill and its sha256 digest.
 
 - Exit 0: the key works. Check that its scopes cover the task, then go on.
 - Exit 4: no key is set up. Go to step 2.

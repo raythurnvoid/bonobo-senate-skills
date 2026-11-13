@@ -15,13 +15,14 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.6.8";
+const VERSION = "1.6.9";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
 Key:
   login --origin <api origin>     Read the key from stdin (a pipe or a hidden prompt), check it, save it.
-  status                          Check the saved key. Prints the organization, workspace, and scopes.
+  status                          Check the saved key. Prints the organization, workspace, and scopes,
+                                  and the skill version the API serves (servedVersion).
   logout                          Delete the saved key file.
 
 Files:
@@ -401,6 +402,25 @@ async function read_all_refused(credentials, job) {
 	}
 	return { ...job, refused, renamed, refusedCursor: null };
 }
+/**
+ * Read the press-api version that the API serves for its own deploy, or null when it cannot be read.
+ * The skill index is public, so this request sends no key.
+ */
+async function read_served_version(origin) {
+	try {
+		const response = await fetch(new URL("/.well-known/agent-skills/index.json", origin), {
+			redirect: "error",
+			signal: AbortSignal.timeout(5000),
+		});
+		if (!response.ok) return null;
+		const index = await response.json();
+		const version = index?.skills?.find?.((skill) => skill?.name === "press-api")?.version;
+		return typeof version === "string" ? version : null;
+	} catch {
+		// A missing index (an older server) or a slow network must not fail the key check.
+		return null;
+	}
+}
 // #endregion requests
 
 // #region commands
@@ -446,10 +466,18 @@ async function command_status() {
 		);
 	}
 
+	const servedVersion = await read_served_version(credentials.origin);
+	if (servedVersion && servedVersion !== VERSION) {
+		process.stderr.write(
+			`This copy is press-api ${VERSION}, but ${credentials.origin} serves ${servedVersion}. Update the skill the way you installed it (see the bonobo-senate-skills README).\n`,
+		);
+	}
+
 	console.log(
 		JSON.stringify(
 			{
 				version: VERSION,
+				servedVersion,
 				source: credentials.source,
 				...(credentials.source === "file" ? { path: CREDENTIALS_PATH } : {}),
 				origin: credentials.origin,
