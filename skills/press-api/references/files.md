@@ -24,7 +24,7 @@ Read the file, change it on your computer, and write it back only if nobody save
 
 Without the CLI it is the same: read with `files/read` and keep `X-File-Revision`, then send it as `expectedRevision` to `files/write` or `files/edit`.
 
-To create a file only when it is missing, send `overwrite: "fail"`: `call files/write '{"path":"/Notes/new.md","content":"# New\n","overwrite":"fail"}'`. Do not run `stat` and then a plain `write`: another writer can create the file in between, and your write replaces it.
+To create a file only when it is missing, send `overwrite: "fail"`: `call files/write '{"path":"/Notes/new.md","content":"# New\n","overwrite":"fail"}'`. Do not run `stat` and then a plain `write`: another writer can create the file in between, and your write replaces it. When the file is already there, the answer is 409 `file_exists`.
 
 ## Read (`files/read`)
 
@@ -51,7 +51,7 @@ List the children of a folder, or everything below it.
 - Pages: keep every other field unchanged while you follow `cursor`. Stop when `isDone` is `true`; the last page has `cursor: null`. A short page is not the end. Move, Rename, access context, or membership changes can end a cursor. On 400 `errorCode: "invalid_cursor"`, start again with `cursor: null` and skip node IDs you already have. Do not inspect or edit the sealed cursor.
 - Filters: `extension: "md"` selects one extension. For type families, use `recursive: true` and 1 to 8 `contentTypePrefixes`, with no extension. Values are whole families such as `image/` or exact types such as `image/png`; `image/p` is an exact type, not a prefix search. Filters use indexes. Narrowing the output does not open locked folders.
 - Locked items: list a readable folder to see its locked children. A locked row gives file facts, not content or custom fields. Recursive reads show a locked folder once and never enter it. A guest with an exact folder share may get 403 for `/`; list the shared path instead.
-- Errors: missing folder or folder in Trash: 404 `Folder not found: <path>`. Locked folder or file, or any path below a locked folder: 403 `Permission denied: <path>`, also for a missing name below it. Readable file passed as a folder: 400 `Path must point to a folder: <path>`.
+- Errors are JSON with `message` and `errorCode`. Missing folder or folder in Trash: 404 `not_found` (`Folder not found: <path>`). Locked folder or file, or any path below a locked folder: 403 `permission_denied` (`Permission denied: <path>`), also for a missing name below it. Readable file passed as a folder, or a bad body: 400 `invalid_input` (`Path must point to a folder: <path>`). Bad cursor: 400 `invalid_cursor`. A bad key: 401 `unauthenticated`. Too many requests: 429 `rate_limited`.
 
 ## Check paths (`files/stat`)
 
@@ -68,14 +68,14 @@ Say for each path whether something is there. The CLI is `stat <path>... [--expe
 Create or replace one editable text file. The CLI is `write <path> --from <file | -> [--if-revision <revision>]`.
 
 - Body: `{ path, content, overwrite?: "replace" | "fail", skipIfUnchanged?, nonCollaborative?, contentType?, expectedRevision? }`.
-- Success: `{ path, nodeId, contentType, revision, size, contentChanged }`, plus `unchanged: true` when nothing was saved. `revision` equals the `X-File-Revision` of the next read.
+- Success: `{ path, nodeId, contentType, revision, size, contentChanged, normalizations, usedEditorText }`, plus `unchanged: true` when nothing was saved. `revision` equals the `X-File-Revision` of the next read.
 - Empty text is refused. Use [`touch`](#empty-files-filestouch) for new empty files.
-- Save rule: the saved text is your text byte for byte, except that line endings become LF and a leading BOM is removed, like in the app's text editor. `contentChanged: true` says this rule changed your text. `skipIfUnchanged` compares the saved bytes, so a change in spacing or line breaks alone is saved.
+- Save rule: the saved text is your text byte for byte, except that line endings become LF and a leading BOM is removed, like in the app's text editor. `normalizations` names each part of the rule that changed your text: `line_endings`, `bom_removed`, or `[]`. `contentChanged` is `true` when that list is not empty. A write always saves your own text, so `usedEditorText` is `false`. `skipIfUnchanged` compares the saved bytes, so a change in spacing or line breaks alone is saved.
 - `expectedRevision` makes the write conditional. The file must exist and still have that revision. A changed, moved, replaced, or deleted file returns 409 `file_changed`, and nothing is created. A matching revision while someone's typing is not saved yet (`X-File-Is-Latest: false`) returns 409 `file_not_latest`; read again later. It cannot be combined with `overwrite: "fail"`.
 - Without `expectedRevision`, the server tries again by itself when someone types during the write, up to three times, then answers 409 `file_busy`.
 - A file the app marks for repair returns 409 `file_needs_repair`. A locked path is refused before any revision check.
 - Writes save directly. Filling an editable file keeps its node ID. Replacing a stored binary file moves the old node to Trash and creates a new one.
-- `overwrite: "fail"` returns 409 `A file already exists at this path`, also for a visible locked name. Overwriting a locked file, or writing any name below a locked folder, returns 403. Read-only can still refuse an otherwise allowed write.
+- `overwrite: "fail"` returns 409 `file_exists` (`A file already exists at this path`), also for a visible locked name. A folder at the path returns 409 `conflict`. Overwriting a locked file, or writing any name below a locked folder, returns 403. Read-only can still refuse an otherwise allowed write.
 - Type: an omitted type uses the new name's type hint; an existing editable file keeps its stored type. A requested type must be editable and match an existing editable target.
 - `nonCollaborative: true` chooses saved-text storage for a new file; it does not change an existing file's mode. `skipIfUnchanged` can avoid a needless fill.
 - Text saves need available credits and charge a file-save event when content is published.
@@ -102,7 +102,7 @@ Change part of an existing editable text file (`files/edit`, `files/append`). Th
 - `oldText` must not be empty. The match is literal, with no trimming or patterns. No match is 409 `text_not_found`. More than one match, also overlapping ones, is 409 `text_not_unique`: add text around it so it matches once. A refusal a save would give (a revoked key, no write access, Read-only, needs repair, or a stale `expectedRevision`) comes first, also before a 400 for a result over the size limit.
 - `oldText` equal to `newText`, or an empty `content`, saves nothing and answers `unchanged: true`. An edit may leave the file empty.
 - Text with a lone surrogate (not valid Unicode) is 400. The result follows the save rule of `write`.
-- When someone is typing in the file, the change starts from their text in the editor, so the saved file has the editor's format. `contentChanged: true` says so; read the file to check.
+- When someone is typing in the file, the change starts from their text in the editor, so the saved file has the editor's format. `usedEditorText: true` says so; read the file to check. `normalizations` names the save rules that changed the result. `contentChanged` is `true` when either one says the saved text differs.
 - `expectedRevision`, retries, and `file_busy` work like in `write`. Without `expectedRevision`, sending an append again after a lost answer can add the text twice. Send `expectedRevision` when you may send the request again.
 
 ## Empty files (`files/touch`)

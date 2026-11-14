@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.6.9";
+const VERSION = "1.6.10";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -1121,9 +1121,18 @@ async function command_change(kind, args) {
 		throw error;
 	}
 
+	// The answer names each reason the saved text differs from what was sent.
 	if (result.json.contentChanged) {
+		const reasons = [
+			...result.json.normalizations.map((rule) =>
+				rule === "line_endings" ? "line endings became LF" : "a leading BOM was removed",
+			),
+			...(result.json.usedEditorText
+				? ["the change started from someone's unsaved typing, in the editor's format"]
+				: []),
+		];
 		process.stderr.write(
-			"Note: the saved text is not exactly what you sent. Line endings became LF, a leading BOM was removed, or it holds someone's unsaved typing in the editor's format. Read the file to check.\n",
+			`Note: the saved text is not exactly what you sent: ${reasons.join("; ")}. Read the file to check.\n`,
 		);
 	}
 	print_json(result.json);

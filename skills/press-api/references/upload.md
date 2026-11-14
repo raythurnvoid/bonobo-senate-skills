@@ -133,5 +133,5 @@ $body = @{ path = "/notes"; cursor = $null; limit = 100 } | ConvertTo-Json
 - `errorCode: "storage_failure"` in `errors`: a server error for that one file. Send only the failed files again.
 - 402: no credits left.
 - 403: the key lacks `files:write`, the folder is locked, or storage is full.
-- 409: a file already exists and you sent `"overwrite": "fail"`.
+- 409, or `errorCode: "file_exists"` in the `errors` of `files/write-many`: a file already exists and you sent `"overwrite": "fail"`.
 - 429: wait `retryAfterMs`, then send the same request again.

@@ -2,7 +2,7 @@
 
 All client rows below use POST. Caller names are defined in [auth](auth.md). “Key” means personal or service key unless the row says personal. “Service secret” means `X-Bonobo-Service-Authorization: Bearer <registered secret>` in addition to the indicated bearer, except member/change reads, which use that header alone with an existing verified connection. A plugin token derives its installation; it cannot choose another installation in its body.
 
-Request bodies are strict. A field a route does not know returns 400 with a message that names it, for example `Unknown request field "expectedRevison" in "files.2". Remove it.` Files `write`, `edit`, `append`, and `write-many` also return `errorCode: "invalid_input"`. Free-form values, such as a plugin document `value`, accept any fields.
+Request bodies are strict. A field a route does not know returns 400 with a message that names it, for example `Unknown request field "expectedRevison" in "files.2". Remove it.` Files `list`, `write`, `edit`, `append`, and `write-many` also return `errorCode: "invalid_input"`. Free-form values, such as a plugin document `value`, accept any fields.
 
 | Path | Method | Class | Callers | Scope | Extra auth | Guide |
 | --- | --- | --- | --- | --- | --- | --- |
