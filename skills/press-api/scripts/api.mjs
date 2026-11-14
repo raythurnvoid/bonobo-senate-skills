@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.6.10";
+const VERSION = "1.7.0";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -896,7 +896,7 @@ async function command_upload(args) {
 			}
 
 			// The folder limit counts the whole batch, not the named file. Send the batch in two halves.
-			if (result.json?.code === "too_many_folders" && batch.length > 1) {
+			if (result.json?.errorCode === "too_many_folders" && batch.length > 1) {
 				const half = Math.ceil(batch.length / 2);
 				batches.unshift(batch.slice(0, half), batch.slice(half));
 				batch = [];

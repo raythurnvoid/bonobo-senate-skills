@@ -132,6 +132,7 @@ $body = @{ path = "/notes"; cursor = $null; limit = 100 } | ConvertTo-Json
 - 400 with a `path`: fix that name (step 2) and send the batch again.
 - `errorCode: "storage_failure"` in `errors`: a server error for that one file. Send only the failed files again.
 - 402: no credits left.
-- 403: the key lacks `files:write`, the folder is locked, or storage is full.
+- 403: the key lacks `files:write` (`permission_denied`), the folder is locked (`permission_denied`), or storage is full (`storage_full`).
+- 409 `read_only`: the folder or file is Read-only. Ask someone to turn Read-only off.
 - 409, or `errorCode: "file_exists"` in the `errors` of `files/write-many`: a file already exists and you sent `"overwrite": "fail"`.
 - 429: wait `retryAfterMs`, then send the same request again.

@@ -41,15 +41,16 @@ POST `/api/v1/auth/verify` with a personal or service key. It returns `{ organiz
 
 ## Errors and retries
 
-Read HTTP status and the JSON error body before reading success fields. Most routes return `{ message }`; some add `errorCode`, `code`, `path`, or `retryAfterMs`. Keep route-specific meanings from the matching guide.
+Read HTTP status and the JSON error body before reading success fields. Every `/api/v1` error is `{ message, errorCode }`, sometimes with `path`, `nodeId`, `runId`, or `retryAfterMs`. `errorCode` is a short label such as `read_only` or `rate_limited`. Branch on `errorCode`, not on the message. One label always comes with the same status, in every route. Keep route-specific meanings from the matching guide.
 
 - 400: fix the request. A Files `invalid_cursor` means restart with `cursor: null`.
 - 401: the credential or its live membership is unavailable. Do not keep retrying it.
 - 403: the caller lacks the scope, token kind, or target access. Files locked paths use this status.
 - 404: missing data. AI conversations also use it for another creator's or tenant's target.
-- 409: a conflict. AI `transcript_changed` requires a fresh export. Plugin revisions have their own conflict rules.
+- 409: a conflict. `errorCode` says which one, for example `file_exists`, `read_only`, or `move_busy`. AI `transcript_changed` requires a fresh export. Plugin revisions have their own conflict rules.
 - 429: wait for `retryAfterMs` when supplied, then retry the same read. Do not retry in a tight loop.
-- 402 on writes: insufficient credits. Storage and plan refusals can instead use 403.
+- 402 on writes: insufficient credits. Storage and plan refusals can instead use 403 (`storage_full`, `plan_required`).
+- 500 `internal_error`: the server failed. Retry later; a write may already be saved, so check before you write again.
 
 Ordinary public routes have an auth-failure bucket of 60/minute, burst 10 per client and route, and an authorized bucket of 120/minute, burst 20 per credential and route. Batches also spend item tokens. `write-many` has 600/minute, burst 100; upload/download URL batches have 120/minute, burst 20. Plugin runs also have their own API-call budget. Follow actual 429 responses instead of estimating a safe request rate.
 

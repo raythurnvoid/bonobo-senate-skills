@@ -75,7 +75,7 @@ Create or replace one editable text file. The CLI is `write <path> --from <file 
 - Without `expectedRevision`, the server tries again by itself when someone types during the write, up to three times, then answers 409 `file_busy`.
 - A file the app marks for repair returns 409 `file_needs_repair`. A locked path is refused before any revision check.
 - Writes save directly. Filling an editable file keeps its node ID. Replacing a stored binary file moves the old node to Trash and creates a new one.
-- `overwrite: "fail"` returns 409 `file_exists` (`A file already exists at this path`), also for a visible locked name. A folder at the path returns 409 `conflict`. Overwriting a locked file, or writing any name below a locked folder, returns 403. Read-only can still refuse an otherwise allowed write.
+- `overwrite: "fail"` returns 409 `file_exists` (`A file already exists at this path`), also for a visible locked name. A folder at the path returns 409 `conflict`. Overwriting a locked file, or writing any name below a locked folder, returns 403. Read-only can still refuse an otherwise allowed write with 409 `read_only`.
 - Type: an omitted type uses the new name's type hint; an existing editable file keeps its stored type. A requested type must be editable and match an existing editable target.
 - `nonCollaborative: true` chooses saved-text storage for a new file; it does not change an existing file's mode. `skipIfUnchanged` can avoid a needless fill.
 - Text saves need available credits and charge a file-save event when content is published.
@@ -119,7 +119,7 @@ Make folders, like `mkdir -p`.
 - Body: `{ paths }`, 1 to 20 canonical folder paths with no repeats.
 - It makes the missing folders above too. An existing folder answers `created: false`, also a locked one you can see in its folder.
 - Success: `{ items: [{ path, nodeId, created }] }`.
-- All or nothing: one refusal makes no folder and answers `{ message, path }` with 403 `Permission denied`, 409 when a file is at the path or in the way, or 400 for a bad path or a name, path, or folder limit.
+- All or nothing: one refusal makes no folder and answers `{ message, errorCode, path }`: 403 `permission_denied`; 409 `file_exists` or `conflict` when a file is at the path or in the way, `read_only` for a Read-only folder, `move_busy` or `path_busy` while a Move or Trash job holds the path; 400 `invalid_input` for a bad path or a name or path limit, or `too_many_folders`.
 - Making folders needs no credits.
 
 ## Delete (`files/delete`)
@@ -149,7 +149,7 @@ List what is in Trash, newest delete first.
 - `folderNodeId` lists only the deleted items directly inside one folder. Use it when you can open a folder but not its area, for example when an account key has a grant on one folder. The folder may itself be in Trash, so you can walk into a deleted folder. A folder you cannot open answers 403, a missing one 404, and a file 400. Here `top: true` means the item was deleted by another delete than the folder.
 - An account key with only folder grants gets 403 for the open area. Use `files/trash/areas` or `folderNodeId` instead.
 - Plugin frames and runs also work with `workspace.files.read` and applied personal file consent. Whole workspace View or Edit opens the open area. Folder consent opens that folder, including one that later went to Trash. Restore an item before selecting it as new plugin consent. Restricted folders need separate consent. A file-only choice adds no parent access or area. Guests and scheduled runs are refused; scheduled runs get `Scheduled plugin runs cannot use Trash yet.`. Service grants are refused. Plugins see `changedBy` too.
-- A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor. Other errors answer `{ message }` only.
+- A bad or old cursor, or a Move that started or ended while you paged, answers 400 with `errorCode: "invalid_cursor"`. Start again without a cursor.
 
 ## Trash areas (`files/trash/areas`)
 
@@ -188,7 +188,7 @@ Move, rename, or copy, like `mv` and `cp -r`.
 - Body: `{ from, to, onConflict?, requestId }`. `from` is 1 to 100 absolute paths with no repeats, not `/`. `requestId` is 1 to 64 characters that you choose, new for each new request.
 - A key bound to a service account moves and copies only what the account itself may read and change. `copy` also needs `files:read` and `files:download`.
 - When `to` is an existing folder (or `/`), the `from` paths go inside it. Otherwise `from` must be one path, or the answer is 400. Then `to` is its new path, which is also how to rename. A `to` that ends with `/` must be an existing folder, like in `mv`: 409 otherwise. A `from` path that ends with `/` must be a folder: a file there is refused alone with `Not a folder`.
-- The folder above a new `to` path must exist: 409 otherwise. Make it with `mkdir` first. A file in the way is 409 too, and a locked `to` or folder above is 403. A new name must be clean, like in `write` and `upload-urls`: 400 says the name to use instead. The API never renames on its own.
+- The folder above a new `to` path must exist: 409 otherwise. Make it with `mkdir` first. A file in the way is 409 too, a Read-only `to` or folder above is 409 `read_only`, and a locked `to` or folder above is 403. A new name must be clean, like in `write` and `upload-urls`: 400 says the name to use instead. The API never renames on its own.
 - A missing or locked `from` path is refused alone, like in `delete`, and the rest goes on. When nothing is left, `jobId` is `null`.
 - `onConflict` says what happens when a file is already at the destination: `error` (the default for `move`) stops the whole job before it changes anything, `replace` (the default for `copy`) replaces that file, and `skip` keeps it. A copied folder merges into a folder of the same name. Moving a folder onto an existing folder is an error, or is skipped with `skip`.
 - A move keeps the rules of the app, and the key's own scopes come on top. A move never makes an item public. A move into, out of, or between restricted folders, or into a folder with added people, needs `files:permissions`. Such an item is refused alone: it shows in the job's `refused` list with a message that names it, and the other items go on.
