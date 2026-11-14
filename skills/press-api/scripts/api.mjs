@@ -1121,10 +1121,12 @@ async function command_change(kind, args) {
 		throw error;
 	}
 
-	// The answer names each reason the saved text differs from what was sent.
+	// The answer names each reason the saved text differs from what was sent. The change is already
+	// saved here, so a server without these fields must not make the command fail: a rerun could then
+	// append the text twice.
 	if (result.json.contentChanged) {
 		const reasons = [
-			...result.json.normalizations.map((rule) =>
+			...(result.json.normalizations ?? []).map((rule) =>
 				rule === "line_endings" ? "line endings became LF" : "a leading BOM was removed",
 			),
 			...(result.json.usedEditorText
@@ -1132,7 +1134,7 @@ async function command_change(kind, args) {
 				: []),
 		];
 		process.stderr.write(
-			`Note: the saved text is not exactly what you sent: ${reasons.join("; ")}. Read the file to check.\n`,
+			`Note: the saved text is not exactly what you sent: ${reasons.join("; ") || "line endings, a BOM, or someone's unsaved typing"}. Read the file to check.\n`,
 		);
 	}
 	print_json(result.json);
