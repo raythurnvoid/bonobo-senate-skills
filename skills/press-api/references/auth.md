@@ -48,7 +48,8 @@ Read HTTP status and the JSON error body before reading success fields. Every `/
 - 403: the caller lacks the scope, token kind, or target access. Files locked paths use this status.
 - 404: missing data. AI conversations also use it for another creator's or tenant's target.
 - 409: a conflict. `errorCode` says which one, for example `file_exists`, `read_only`, or `move_busy`. AI `transcript_changed` requires a fresh export. Plugin revisions have their own conflict rules.
-- 429: wait for `retryAfterMs` when supplied, then retry the same read. Do not retry in a tight loop.
+- 413 `request_too_large`: the request body is over the route's limit. Send fewer or smaller items.
+- 429 `rate_limited`: wait `retryAfterMs` (every `rate_limited` answer has it), then send the same request again. Do not retry in a tight loop. Another 429 code is a limit that does not refill soon, so do not wait and retry: `call_limit_reached` means a plugin run used all its API calls, and `read_budget_exhausted` means an in-app read grant used its file byte budget.
 - 402 on writes: insufficient credits. Storage and plan refusals can instead use 403 (`storage_full`, `plan_required`).
 - 500 `internal_error`: the server failed. Retry later; a write may already be saved, so check before you write again.
 

@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.7.0";
+const VERSION = "1.7.1";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -334,11 +334,12 @@ async function post(credentials, route, body) {
 	};
 }
 
-// Wait and retry when the server says the rate limit is reached. Other errors return at once.
+// Wait and retry when the server says the rate limit is reached. Other errors return at once, also a
+// 429 with another code (a limit that does not refill, such as `call_limit_reached`).
 async function post_with_retry(credentials, route, body) {
 	for (let attempt = 1; ; attempt++) {
 		const result = await post(credentials, route, body);
-		if (result.status !== 429 || attempt === 5) return result;
+		if (result.status !== 429 || result.json?.errorCode !== "rate_limited" || attempt === 5) return result;
 
 		const waitMs = result.json?.retryAfterMs ?? 2000;
 		process.stderr.write(`Rate limited on ${route}. Waiting ${Math.ceil(waitMs / 1000)}s.\n`);
