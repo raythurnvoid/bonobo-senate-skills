@@ -129,7 +129,7 @@ Move files and folders to Trash, like `rm -r` with several paths.
 - Body: `{ paths, requestId }`, 1 to 200 absolute paths with no repeats, not `/`. Split a longer list into several calls. `requestId` works like in `move`.
 - A key bound to a service account deletes only what the account itself may change.
 - It moves what it can to Trash and refuses each bad path alone. `restore` and the app Trash bring items back.
-- Success: `{ jobId, isDone, refused: [{ path, message }] }`. `refused` names missing paths (`Not found`), locked paths and paths inside a locked folder (`Permission denied`), and items the job refused, such as a read-only file inside a folder.
+- Success: `{ jobId, isDone, refused: [{ path, message, errorCode }] }`. `refused` names missing paths (`not_found`), locked paths and paths inside a locked folder (`permission_denied`), and items the job refused, such as a read-only file inside a folder (`read_only`).
 - A delete that moved something to Trash always has a `jobId`. A big folder goes on in the background: `isDone: false`. `jobId` is `null` only when every path was refused.
 - Send the same `requestId` and body again after a lost answer: you get the same `jobId` and the same `refused` back for 7 days after the job ends, and nothing new is deleted, even if a new item took the path since. The same `requestId` with another body is 409. A delete that refused every path saves nothing, so its retry runs again.
 - Read `jobs/get` for the final result, even when a retry says `isDone: true`. The first answer may not include later failures. The helper's `rm --wait` reads it and exits 1 for a failed job or any refused item.
@@ -174,12 +174,12 @@ This section is for keys. A plugin run with `workspace.files.restore` can restor
 - Each path or node brings back that item and only its descendants with the same `archiveOperationId`. A file comes back alone. Other items from that delete stay in Trash. A descendant from another delete also stays in Trash. Each item comes back at the path it had when it moved to Trash, like `mkdir -p`. When a folder on that path is gone, renamed, or still in Trash, the restore creates a new folder there. A renamed folder keeps its new name, and an old folder in Trash stays there. A file where a folder should be refuses the restore with `file_in_the_way`.
 - Selecting a folder and an item inside it restores each item once. There is still one job per delete id. A job refusal names every original selection from that delete, including a covered child. It never adds unselected items. A retry keeps the original selections and answer.
 - `onConflict` says what happens when an item with the same name is already there: `keep_both` (the default) restores it with a new name such as `notes-2.md`, and `skip` leaves it deleted. `jobs/get` names each item that got a new name or stayed deleted. A job stops with a message when Keep both finds no free name.
-- Success: `{ jobIds, isDone, refused }`, where each refused item is `{ path, message }` or, for `nodes`, `{ nodeId, path, message }`. There is one job for each `delete` call the paths or nodes came from. Read each one with `jobs/get` (it needs `files:list`), also when `isDone` is `true`, because only the job names the items that came back with a new name or stayed in the Trash.
+- Success: `{ jobIds, isDone, refused }`, where each refused item is `{ path, message, errorCode }` or, for `nodes`, `{ nodeId, path, message, errorCode }`. There is one job for each `delete` call the paths or nodes came from. Read each one with `jobs/get` (it needs `files:list`), also when `isDone` is `true`, because only the job names the items that came back with a new name or stayed in the Trash.
 - `refused` names paths with no deleted item (`Not found`), paths of items that are not deleted (`Not in the Trash`), locked paths (`Permission denied`), paths deleted more than once (find the one you want in `files/trash/list` and restore it by `nodes`), and paths whose job could not start, with the reason.
-- A refused node is `{ nodeId, path, message }`. `Not found` and `Permission denied` have `path: null`. "This Trash item changed. List the Trash and pick it again." means the item was restored or deleted again since you listed it.
+- A refused node is `{ nodeId, path, message, errorCode }`. `not_found` and `permission_denied` have `path: null`. "This Trash item changed. List the Trash and pick it again." means the item was restored or deleted again since you listed it.
 - A job that started but stopped partway (`Stopped partway: …`) keeps what it restored, and it is in `jobIds` too: read it to see what is still in the Trash. It can still be `stopping` for a short while, so `isDone` can be `false`; wait until `jobs/get` shows it finished. The other paths are still restored.
 - Send the same `requestId` and body again after a lost answer: you get the same `jobIds` back for 7 days, and nothing is restored twice, even if the item was deleted again since. The same `requestId` with another body is 409.
-- 429 means too many changes in a row; wait (`retryAfterMs` when it is there) and send the same request again.
+- 429 `rate_limited` means too many changes in a row; wait `retryAfterMs` and send the same request again.
 
 ## Move and copy (`files/move`, `files/copy`)
 
@@ -192,17 +192,17 @@ Move, rename, or copy, like `mv` and `cp -r`.
 - A missing or locked `from` path is refused alone, like in `delete`, and the rest goes on. When nothing is left, `jobId` is `null`.
 - `onConflict` says what happens when a file is already at the destination: `error` (the default for `move`) stops the whole job before it changes anything, `replace` (the default for `copy`) replaces that file, and `skip` keeps it. A copied folder merges into a folder of the same name. Moving a folder onto an existing folder is an error, or is skipped with `skip`.
 - A move keeps the rules of the app, and the key's own scopes come on top. A move never makes an item public. A move into, out of, or between restricted folders, or into a folder with added people, needs `files:permissions`. Such an item is refused alone: it shows in the job's `refused` list with a message that names it, and the other items go on.
-- Success: `{ jobId, isDone, refused: [{ path, message }] }`. The job goes on in the background; read it with `jobs/get`.
+- Success: `{ jobId, isDone, refused: [{ path, message, errorCode }] }`. The job goes on in the background; read it with `jobs/get`.
 - Send the same `requestId` and body again after a lost answer: you get the same `jobId` back, also after the job has finished, and nothing runs twice. The same `requestId` with another body is 409.
 - A person runs one move or copy at a time per workspace, including ones started in the app: a second one is 409 until the first ends.
-- 429 means too many changes in a row; wait (`retryAfterMs` when it is there) and send the same request again.
+- 429 `rate_limited` means too many changes in a row; wait `retryAfterMs` and send the same request again.
 
 ## Jobs (`files/jobs/get`)
 
 Read a job that `delete`, `restore`, `move`, or `copy` started.
 
 - Body: `{ jobId, cursor? }`.
-- Success: `{ jobId, kind: "delete" | "restore" | "move" | "copy", status, progress, errorMessage, refused: [{ path, message }] (a restore by `nodes` also has `nodeId`), renamed: [{ path, newPath }], refusedCursor }`.
+- Success: `{ jobId, kind: "delete" | "restore" | "move" | "copy", status, progress, errorMessage, refused: [{ path, message, errorCode }] (a restore by `nodes` also has `nodeId`), renamed: [{ path, newPath }], refusedCursor }`.
 - `status` is `queued`, `running`, `succeeded`, `partial` (some items were refused), `failed`, `timed_out`, or `canceled`.
 - Refused items: a delete job keeps the first answer's refusals and adds later ones, without exact path-and-message repeats. Saved refusals may keep old paths. A live item path is `null` when the key can no longer read it. A move or copy job keeps the paths it saw when it ran. A copy skips a locked item inside a copied folder and lists it there with `Permission denied`.
 - Pages: a move, copy, or restore job gives its items 100 at a time. While `refusedCursor` is not `null`, call again with `cursor: <refusedCursor>`. The paths refused at the start come on the first page only. A delete job has all of them on one page.
