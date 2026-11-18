@@ -3,7 +3,7 @@
 // Small Bonobo Senate public API client for agents and people on a PC. Node 22 or newer, no dependencies.
 // Read references/setup.md in this skill folder before using it.
 //
-// Exit codes: 0 ok, 1 the API or an upload failed, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.
+// Exit codes: 0 ok, 1 a request failed or a copy was incomplete, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -36,6 +36,9 @@ Files:
   read <path> [--to <file>]       Write the saved bytes of a file to stdout, or to --to, following every page.
                                   Then print { path, contentType, revision, size, isLatest }: on stdout with
                                   --to, on stderr without. In PowerShell, use --to: before 7.4, > breaks bytes.
+  download <folder> --to <dir> [--resume]
+                                  Copy the folder contents. Keep existing local files and record failures.
+  download-status --to <dir>      Show the last download checkpoint. Works offline.
   write <path> --from <file | -> [--if-revision <revision>]
                                   Create a text file or replace its whole text. - reads stdin.
   mkdir <path>...                 Create folders and the folders above them, like mkdir -p. All or nothing.
@@ -79,7 +82,7 @@ Any route:
                                   POST one route, for example: call files/list '{"path":"/"}'
                                   Use - to read the JSON body from stdin. --out saves a raw byte answer.
 
-Exit codes: 0 ok, 1 the API or an upload failed, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.`;
+Exit codes: 0 ok, 1 a request failed or a copy was incomplete, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.`;
 
 // Keep the key in the home folder, not in this skill folder and not in AppData.
 // A reinstall of the skill replaces its folder, which would delete the key.
@@ -297,7 +300,7 @@ async function read_utf8_text(file) {
 // #endregion credentials
 
 // #region requests
-async function post(credentials, route, body) {
+async function post(credentials, route, body, signal) {
 	const routePath = route.startsWith("/api/v1/") ? route : `/api/v1/${route.replace(/^\/+/u, "")}`;
 	const response = await fetch(new URL(routePath, credentials.origin), {
 		method: "POST",
@@ -307,10 +310,12 @@ async function post(credentials, route, body) {
 		},
 		body: body === undefined ? undefined : JSON.stringify(body),
 		redirect: "error",
+		signal,
 	}).catch((error) => {
 		// A failed connect can have an empty cause message and only a code such as ETIMEDOUT.
 		throw new NetworkError(
 			`Cannot reach ${credentials.origin}: ${error.cause?.message || error.cause?.code || error.message}. Check the network and any sandbox network allowlist. The key may be fine.`,
+			{ cause: error },
 		);
 	});
 
@@ -323,7 +328,7 @@ async function post(credentials, route, body) {
 		bytes = Buffer.from(await response.arrayBuffer());
 		json = isJson ? JSON.parse(bytes.toString("utf8")) : null;
 	} catch (error) {
-		throw new NetworkError(`Lost the answer from ${credentials.origin}: ${error.message}.`);
+		throw new NetworkError(`Lost the answer from ${credentials.origin}: ${error.message}.`, { cause: error });
 	}
 	return {
 		status: response.status,
@@ -1007,6 +1012,39 @@ async function command_upload(args) {
 	return failed.length > 0 || pending.length > 0 ? 1 : 0;
 }
 
+async function command_download(args) {
+	const { values, positionals } = parseArgs({
+		args,
+		allowPositionals: true,
+		options: { to: { type: "string" }, resume: { type: "boolean" } },
+	});
+	if (positionals.length !== 1 || !values.to) throw new UsageError("Use download <folder> --to <directory> [--resume].");
+	check_workspace_paths(positionals);
+	const source = positionals[0].replace(/\/+$/u, "") || "/";
+	if (source !== "/" && source.slice(1).split("/").some((part) => !part || part === "." || part === "..")) {
+		throw new UsageError("Give a full workspace folder path without . or .. segments.");
+	}
+	const credentials = load_credentials();
+	credentials.origin = check_origin(credentials.origin);
+	const { download_folder } = await import("./download.mjs");
+	const result = await download_folder({
+		source,
+		destination: path.resolve(values.to),
+		resume: values.resume ?? false,
+		origin: credentials.origin,
+		post: (route, body) => post(credentials, route, body, AbortSignal.timeout(90_000)),
+	});
+	print_json(result.report);
+	return result.exitCode;
+}
+
+async function command_download_status(args) {
+	const { values } = parseArgs({ args, options: { to: { type: "string" } } });
+	if (!values.to) throw new UsageError("Use download-status --to <directory>.");
+	const { download_status } = await import("./download-files.mjs");
+	print_json(await download_status(path.resolve(values.to)));
+}
+
 async function command_read(args) {
 	const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { to: { type: "string" } } });
 	if (positionals.length !== 1) throw new UsageError(`Give one workspace path.\n\n${USAGE}`);
@@ -1190,6 +1228,8 @@ const commands = {
 	cp: (args) => command_transfer("copy", args),
 	job: command_job,
 	upload: command_upload,
+	download: command_download,
+	"download-status": command_download_status,
 	read: command_read,
 	write: (args) => command_change("write", args),
 	edit: (args) => command_change("edit", args),

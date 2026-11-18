@@ -6,7 +6,7 @@ The helper is [api.mjs](../scripts/api.mjs). It needs Node 22 or newer and has n
 
 Run `help` to list every command. `--help` after any command prints the same list.
 
-Exit codes: 0 ok, 1 the API refused something or an upload failed, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up.
+Progress goes to stderr. Folder downloads print one JSON result on stdout. Exit codes: 0 ok, 1 the API refused something or a copy was incomplete, 2 usage error, 3 cannot reach the API or lost its answer, 4 no API key is set up. See [folder downloads](download.md) to start, inspect, or resume a copy.
 
 ## 1. Check for a key
 

@@ -232,6 +232,8 @@ Upload files of any type through signed URLs. On a PC, the helper CLI in [setup]
 
 ## Download URLs (`files/download-urls`)
 
+For a whole folder, use the [resumable download command](download.md).
+
 Get temporary download links by node ID.
 
 - Body: `{ fileNodeIds, expiresInSeconds?, download? }`. Send at most 20 IDs to avoid clipping.
