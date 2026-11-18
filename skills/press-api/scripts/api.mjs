@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.7.4";
+const VERSION = "1.8.0";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -28,6 +28,8 @@ Key:
 Files:
   ls [folder] [--recursive] [--all] [--cursor <c>]
                                   List a folder. --all follows every page.
+  search <words> [--folder <path>]
+                                  Find words inside saved files. Example: search "release date" --folder /notes
   stat <path>... [--expect found|missing|denied]
                                   Say for each path: found (with its details), missing, or denied.
                                   Exit 0 when every path has the --expect status (default found), else 1.
@@ -577,6 +579,25 @@ async function command_ls(args) {
 		if (!values.all || page.isDone) break;
 	}
 	print_json({ items, cursor, isDone: cursor === null });
+}
+
+async function command_search(args) {
+	const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { folder: { type: "string" } } });
+	const query = positionals.join(" ").trim();
+	if (!query) throw new UsageError("Give one or more words to search for.");
+	if (values.folder !== undefined) check_workspace_paths([values.folder]);
+
+	const credentials = load_credentials();
+	const items = [];
+	let searchedTop = false;
+	let cursor;
+	do {
+		const page = await post_json(credentials, "files/search", { query, folderPath: values.folder, cursor });
+		items.push(...page.items);
+		searchedTop ||= page.searchedTop;
+		cursor = page.nextCursor;
+	} while (cursor);
+	print_json({ items, searchedTop });
 }
 
 async function command_stat(args) {
@@ -1158,6 +1179,7 @@ const commands = {
 	status: command_status,
 	logout: command_logout,
 	ls: command_ls,
+	search: command_search,
 	stat: command_stat,
 	mkdir: command_mkdir,
 	rm: command_rm,

@@ -83,6 +83,7 @@ An uploaded file is `pending` until the server confirms its bytes. Until then `f
 
 ```sh
 node <skill folder>/scripts/api.mjs ls /Inbox --all
+node <skill folder>/scripts/api.mjs search "release date" --folder /notes
 node <skill folder>/scripts/api.mjs stat /Inbox/a.md /Inbox/old
 node <skill folder>/scripts/api.mjs mkdir /Projects/2026/Q1 /Projects/2026/Q2
 node <skill folder>/scripts/api.mjs rm /Inbox/old /Inbox/tmp.md --wait

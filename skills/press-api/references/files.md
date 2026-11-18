@@ -41,6 +41,14 @@ Read the saved bytes of a text or binary file, one page at a time. The CLI `read
 - Short grants share an 8 MiB read budget in one `execute_code` run, across the current workspace and personal/home. Each page reserves its planned bytes before it reads them. Failed reads and retries are not refunded. Ordinary keys have the page cap and rate limits without that per-run budget. Short grants never mint signed download URLs.
 - The CLI `call files/read` returns one page only. Its raw bytes go to stdout or `--out`; the file headers go to stderr as JSON. Follow the next cursor with another call. A preview client can stop after its first page and keep only the bytes it needs.
 
+## Content search (`files/search`)
+
+Run `search "release date" --folder /notes` to search saved, indexed text under a folder. Omit `--folder` to search the whole workspace. A personal key searches files its user can read. A service key searches files its service account can read. Both keys need `files:list` and `files:read`.
+
+The CLI prints `{ items, searchedTop }`. Each item has a `path`, `snippet`, and `lineStart`. One file can match in several text chunks and appear more than once. When `searchedTop` is true, the index reached its limit of 1,024 matching chunks before folder and access checks. More files may match. Try more specific words.
+
+For one API page, post `{ "query": "release date", "folderPath": "/notes" }`. Send the same query and folder with `cursor` set to the returned `nextCursor` until it is null. Even an empty page can have a next cursor. The CLI follows these pages for you.
+
 ## List (`files/list`)
 
 List the children of a folder, or everything below it.
