@@ -15,7 +15,7 @@ const SCRIPT = `node "${fileURLToPath(import.meta.url)}"`;
 
 // Keep this equal to metadata.version in ../SKILL.md, so a user can tell whether a copy is current.
 // The skill test in the Bonobo Senate repo checks that the two match.
-const VERSION = "1.7.3";
+const VERSION = "1.7.4";
 
 const USAGE = `Usage: node api.mjs <command> [options]. Workspace paths start with /. Skill version ${VERSION}.
 
@@ -468,9 +468,18 @@ async function command_status() {
 	}
 
 	const servedVersion = await read_served_version(credentials.origin);
-	if (servedVersion && servedVersion !== VERSION) {
+	if (servedVersion !== null && servedVersion !== VERSION) {
+		let versionLabel = JSON.stringify(servedVersion);
+		let advice = "The version order is unknown.";
+		if (/^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){2}$/u.test(servedVersion)) {
+			versionLabel = servedVersion;
+			advice =
+				servedVersion.localeCompare(VERSION, "en", { numeric: true }) > 0
+					? "Update the skill the way you installed it (see the bonobo-senate-skills README)."
+					: "Your local copy is newer.";
+		}
 		process.stderr.write(
-			`This copy is press-api ${VERSION}, but ${credentials.origin} serves ${servedVersion}. Update the skill the way you installed it (see the bonobo-senate-skills README).\n`,
+			`This copy uses press-api ${VERSION}. ${credentials.origin} serves ${versionLabel}. ${advice}\n`,
 		);
 	}
 
