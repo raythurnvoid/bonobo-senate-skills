@@ -43,7 +43,7 @@ POST `/api/v1/auth/verify` with a personal or service key. It returns `{ organiz
 
 Read HTTP status and the JSON error body before reading success fields. Every `/api/v1` error is `{ message, errorCode }`, sometimes with `path`, `nodeId`, `runId`, or `retryAfterMs`. `errorCode` is a short label such as `read_only` or `rate_limited`. Branch on `errorCode`, not on the message. One label always comes with the same status, in every route. Keep route-specific meanings from the matching guide.
 
-- 400: fix the request. A Files `invalid_cursor` means restart with `cursor: null`.
+- 400: fix the request. A Files `invalid_cursor` ends that listing. Download keeps its partial result and supports explicit `--resume`.
 - 401: the credential or its live membership is unavailable. Do not keep retrying it.
 - 403: the caller lacks the scope, token kind, or target access. Files locked paths use this status.
 - 404: missing data. AI conversations also use it for another creator's or tenant's target.

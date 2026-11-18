@@ -20,6 +20,7 @@ function network_detail(error) {
 function api_failure(route, result) {
 	const codes = [
 		"invalid_cursor",
+		"listing_busy",
 		"rate_limited",
 		"not_found",
 		"permission_denied",
@@ -159,9 +160,8 @@ export async function download_folder({ origin, source, destination, resume, pos
 				? api_failure(route, result)
 				: failure(route, "network_error", "Could not reach the API or read its answer" + detail + ".");
 			const retry = attempt < MAX_ATTEMPTS && (!result || result.status >= 500 || error.code === "rate_limited");
-			const restart = error.code === "invalid_cursor" && route === "files/list" && restarts < 3;
 			const split = route === "files/download-urls" && result?.status === 403 && paths.length > 1;
-			for (const path of paths) await record(error, path, attempt, retry || restart || split);
+			for (const path of paths) await record(error, path, attempt, retry || split);
 			if (!retry) throw error;
 			report.retries++;
 			const wait = result?.json?.retryAfterMs;
@@ -338,27 +338,11 @@ export async function download_folder({ origin, source, destination, resume, pos
 		);
 	}
 
-	let restarts = 0;
-	let checkPreviousPaths = resume;
 	try {
 		identity = await identify();
 		let cursor = null;
 		for (;;) {
-			let page;
-			try {
-				page = await list(cursor);
-			} catch (error) {
-				if (error.code !== "invalid_cursor" || ++restarts > 3) throw error;
-				await recheck_root();
-				cursor = null;
-				if (store) {
-					checkPreviousPaths = true;
-					await store.begin_scan();
-				}
-				report.retries++;
-				Object.assign(report, { filesSeen: 0, saved: 0, verified: 0, bytes: 0, failed: 0, denied: 0, conflicts: 0 });
-				continue;
-			}
+			const page = await list(cursor);
 			// A first page has no cursor bound to the original folder. Check its identity again
 			// before writing any rows in case another folder took the path during the request.
 			if (cursor === null && (await root_id(identity.workspaceId)) !== identity.rootId) {
@@ -418,7 +402,7 @@ export async function download_folder({ origin, source, destination, resume, pos
 			cursor = page.cursor;
 		}
 		// Only a previous scan can have seen a path missing from this one.
-		if (checkPreviousPaths) {
+		if (resume) {
 			report.phase = "checking_previous_paths";
 			report.pathsChecked = 0;
 			await progress();
