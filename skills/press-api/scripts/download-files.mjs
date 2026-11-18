@@ -378,7 +378,7 @@ export async function open_download(destination, identity, resume) {
 				fs.unlinkSync(temp);
 				return size;
 			},
-			async *unseen() {
+			async *previous_paths() {
 				directory(receipts);
 				for await (const shard of await fs.promises.opendir(receipts)) {
 					const dir = path.join(receipts, shard.name);
@@ -387,10 +387,9 @@ export async function open_download(destination, identity, resume) {
 						if (!file.name.endsWith(".json")) continue;
 						const receipt = path.join(dir, file.name);
 						const record = read_json(receipt);
-						if (record.scan !== scan) {
-							discard_unpublished(receipt);
-							yield { path: record.path, nodeId: record.nodeId, kind: record.kind };
-						}
+						const listed = record.scan === scan;
+						if (!listed) discard_unpublished(receipt);
+						yield { path: record.path, listed };
 					}
 				}
 			},

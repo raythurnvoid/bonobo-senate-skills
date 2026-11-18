@@ -320,6 +320,10 @@ export async function download_folder({ origin, source, destination, resume, pos
 	async function progress() {
 		lastProgress = Date.now();
 		await store.progress(report);
+		if (report.phase === "checking_previous_paths") {
+			process.stderr.write("Checking previous paths: " + report.pathsChecked + " checked.\n");
+			return;
+		}
 		process.stderr.write(
 			report.filesSeen +
 				" files seen, " +
@@ -335,6 +339,7 @@ export async function download_folder({ origin, source, destination, resume, pos
 	}
 
 	let restarts = 0;
+	let checkPreviousPaths = resume;
 	try {
 		identity = await identify();
 		let cursor = null;
@@ -346,7 +351,10 @@ export async function download_folder({ origin, source, destination, resume, pos
 				if (error.code !== "invalid_cursor" || ++restarts > 3) throw error;
 				await recheck_root();
 				cursor = null;
-				if (store) await store.begin_scan();
+				if (store) {
+					checkPreviousPaths = true;
+					await store.begin_scan();
+				}
 				report.retries++;
 				Object.assign(report, { filesSeen: 0, saved: 0, verified: 0, bytes: 0, failed: 0, denied: 0, conflicts: 0 });
 				continue;
@@ -409,14 +417,25 @@ export async function download_folder({ origin, source, destination, resume, pos
 			if (page.isDone) break;
 			cursor = page.cursor;
 		}
-		for await (const item of store.unseen()) {
-			await record(
-				failure("list", "no_longer_listed", "Previously seen path is no longer listed."),
-				item.path,
-				1,
-				false,
-			);
-			report.conflicts++;
+		// Only a previous scan can have seen a path missing from this one.
+		if (checkPreviousPaths) {
+			report.phase = "checking_previous_paths";
+			report.pathsChecked = 0;
+			await progress();
+			for await (const { path, listed } of store.previous_paths()) {
+				report.pathsChecked++;
+				if (!listed) {
+					await record(
+						failure("list", "no_longer_listed", "Previously seen path is no longer listed."),
+						path,
+						1,
+						false,
+					);
+					report.conflicts++;
+				}
+				if (Date.now() - lastProgress >= 5000) await progress();
+			}
+			delete report.phase;
 		}
 		report.status = report.failed || report.denied || report.conflicts ? "partial" : "complete";
 		await store.progress(report);

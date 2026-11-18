@@ -20,7 +20,7 @@ The copy preserves existing files. A local edit, an unrelated file in the way, a
 
 Each file holds the saved bytes served when downloaded, at its path when listed. Other people can change or move files during a run. An editable file can return its previous saved version while a new version is being saved. A resume keeps verified copies and reports changes it observes. File timestamps cannot prove that the remote bytes are still the same. Locked entries are counted once and locked folders are never entered. Pending uploads can be retried after the upload finishes.
 
-Counts describe the current scan. `saved` and `bytes` count new copies. `verified` counts intact local copies. The log keeps earlier attempts. If the whole run stops, `runError` gives the stage and reason, even when no individual file failed. Before a checkpoint exists, read stderr and the final result.
+Counts describe the current scan. `saved` and `bytes` count new copies. `verified` counts intact local copies. At the end of a resume or restarted scan, `pathsChecked` shows progress while the CLI checks for paths that disappeared. The log keeps earlier attempts. If the whole run stops, `runError` gives the stage and reason, even when no individual file failed. Before a checkpoint exists, read stderr and the final result.
 
 Exit 0 means the scan finished and every entry was handled. A partial result gives exit 1. Check `failed`, `denied`, `conflicts`, and the error log. A lost API connection gives exit 3. Missing credentials give exit 4.
 
