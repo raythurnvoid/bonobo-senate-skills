@@ -49,6 +49,20 @@ The CLI prints `{ items, searchedTop }`. Each item has a `path`, `snippet`, and 
 
 For one API page, post `{ "query": "release date", "folderPath": "/notes" }`. Send the same query and folder with `cursor` set to the returned `nextCursor` until it is null. Even an empty page can have a next cursor. The CLI follows these pages for you.
 
+## Field query (`files/query`)
+
+Find files by one custom field, without reading every file. Run it with the generic command: `call files/query '<json body>'`. A personal key reads what its user can open. A service key reads what its service account can open. Both keys need `files:list` and `files:read`. Short grants in app `execute_code` cannot call this route.
+
+A field is qualified: `metadata.status` for a field set in the app, `frontmatter.due` for a field in a Markdown file's frontmatter.
+
+- Folder mode: `{ "mode": "folder", "path": "/projects", "field": "metadata.status", "match": { "eq": "open" } }` lists the direct children of the folder that have the field, in value order. `match` is `{ eq }` or `{ prefix }`; leave it out, or send `{ exists: true }`, to get every child with a value. Optional: `order: "asc" | "desc"` and `kind: "file" | "folder"` (default `file`). Values compare without case and accents. A prefix must not end in a digit: add the next character (`2026-`, not `2026`). A child with its own sharing rules is left out.
+- Search mode: `{ "mode": "search", "path": "/projects", "field": "metadata.status", "match": { "eq": "open" } }` searches the folder and everything below it. `match` is required: `{ eq }`, `{ prefix }`, `{ exists: true }`, or `{ range: { gte, gt, lte, lt } }` with numbers or ISO dates. `prefix` and `range` search the whole workspace: leave out `path`, and the caller must be able to open the workspace root. Search mode has its own order and takes no `order` or `kind`. A person can run 60 search pages per minute across all their keys and plugins. `prefix` and `range` can return a file again on a later page: dedupe by `nodeId`. Any save in the workspace ends open search cursors (`invalid_cursor`).
+- `fields`: up to 12 more fields to return for each item, for example `["metadata.owner"]`. A field named twice comes back once.
+- Success: `{ items, cursor, isDone }`. Items have `path`, `name`, `kind`, `nodeId`, `contentType`, `updatedAt`, `status`, `size`, `readOnly`, and `fields`. Each asked field is `{ value, isPreview }`; `value` is `null` when the item has no such field, and `isPreview` is true for a cut value or a list with more than one value. The route returns only items the caller can open.
+- Pages: `limit` is at most 50. Keep every other field unchanged while you follow `cursor` (`limit` and `fields` may change). Stop when `isDone` is `true`. A page can be short or empty before the end.
+- Errors are JSON with `message` and `errorCode`: 400 `invalid_input` or `invalid_cursor` (start again from the first page), 403 `permission_denied`, 404 `not_found`, 429 `rate_limited`, and 503 `listing_busy` or `search_unavailable` (retry the same page later).
+- Number order in folder mode is by text. Only whole numbers from 0 up sort by size.
+
 ## List (`files/list`)
 
 List the children of a folder, or everything below it.

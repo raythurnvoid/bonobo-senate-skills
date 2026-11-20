@@ -11,6 +11,7 @@ Request bodies are strict. A field a route does not know returns 400 with a mess
 | `/api/v1/ai-chat/threads/tool-output/read` | POST | client | Personal key | `ai_chat:read` | none | [AI](ai-conversations.md) |
 | `/api/v1/files/list` | POST | client | Key, Short grant, Frame, Run | `files:list` | none | [Files](files.md) |
 | `/api/v1/files/search` | POST | client | Key | `files:list` and `files:read` | none | [Files](files.md#content-search-filessearch) |
+| `/api/v1/files/query` | POST | client | Key, Frame, Run | `files:list` and `files:read` | none | [Files](files.md#field-query-filesquery) |
 | `/api/v1/files/stat` | POST | client | Key | `files:list` | none | [Files](files.md) |
 | `/api/v1/files/mkdir` | POST | client | Key | `files:write` | none | [Files](files.md) |
 | `/api/v1/files/delete` | POST | client | Key | `files:write` | none | [Files](files.md) |
