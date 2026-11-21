@@ -2,7 +2,7 @@
 
 Use the [route index](route-index.md) for scopes and callers. These routes store plugin documents, not Files. A file grant does not grant store access. Reads need current workspace content-read permission; writes need content-write permission and accepted plugin consent.
 
-A personal key must include `installationId` from its own workspace. Plugin tokens must omit it: their installation comes from the token. Missing it for a key gives 400 `installationId is required for an API key`; sending it with a plugin token gives 400 `installationId is not allowed for this token`. Service-bound keys and short grants cannot use these store routes.
+A personal key must include `installationId` from its own workspace. Find it on the plugin's page in the workspace (Plugins, then the plugin): the "Installation ID" row under the header has a Copy button. Plugin tokens must omit it: their installation comes from the token. Missing it for a key gives 400 `installationId is required for an API key`; sending it with a plugin token gives 400 `installationId is not allowed for this token`. Service-bound keys and short grants cannot use these store routes.
 
 All bodies are strict. Unknown fields return 400. JSON bodies are limited to 64 KiB, except `write-batch`, which allows 4 MiB and up to 50 documents. A canonical document value is an object of at most 16 KiB. Unsupported field names, invalid Unicode, excessive nesting, or arrays/objects too large for storage are refused at the request boundary. A generic validation error may not name the bad field.
 
